@@ -8,8 +8,9 @@ import { useDebouncedAutosave } from "../hooks/useDebouncedAutosave.js";
 import { useSong } from "../hooks/useSong.js";
 import { useSongVersions } from "../hooks/useSongVersions.js";
 import { useVersion } from "../hooks/useVersion.js";
-import { callAnalyzeLyrics } from "../repositories/analysesRepository.js";
+import { saveAnalysisResult } from "../repositories/analysesRepository.js";
 import { createVersion, updateVersion } from "../repositories/versionsRepository.js";
+import { analyzeLyrics } from "../services/worker/client.js";
 
 type Tab = "letra" | "analise" | "versoes";
 
@@ -56,7 +57,14 @@ export function VersionView() {
     setAnalyzing(true);
     setError(null);
     try {
-      await callAnalyzeLyrics({ songId: songId!, versionId: versionId! });
+      const { mode, result } = await analyzeLyrics({
+        lyrics: version!.lyrics,
+        sections: version!.sections,
+        context: version!.context,
+        revisionMode: "completa",
+        bibleTranslationPreference: "dominio_publico_almeida",
+      });
+      await saveAnalysisResult(user!.uid, songId!, versionId!, mode, result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível concluir a análise agora.");
     } finally {
@@ -126,13 +134,7 @@ export function VersionView() {
 
         {tab === "analise" &&
           (version.currentAnalysisId && analysis ? (
-            <AnalysisDashboard
-              uid={user.uid}
-              song={song}
-              version={version}
-              analysisId={version.currentAnalysisId}
-              result={analysis.result}
-            />
+            <AnalysisDashboard uid={user.uid} song={song} version={version} result={analysis.result} />
           ) : (
             <div className="flex flex-col items-start gap-3">
               <p className="text-sm text-ink-700/70 dark:text-parchment-100/60">

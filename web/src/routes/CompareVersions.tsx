@@ -1,33 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { diffWords } from "../lib/diff.js";
+import { useAuth } from "../hooks/useAuth.js";
 import { useSong } from "../hooks/useSong.js";
 import { useSongVersions } from "../hooks/useSongVersions.js";
-import { callCompareVersions } from "../repositories/analysesRepository.js";
+import { getAnalysis } from "../repositories/analysesRepository.js";
+import type { AnalysisDoc } from "../types/firestore.js";
 
-interface ComparisonResult {
-  diff: Array<{ text: string; type: "same" | "added" | "removed" }>;
-  dimensions: Record<string, { a: unknown; b: unknown }>;
-  note: string;
-}
-
-const DIMENSION_LABEL: Record<string, string> = {
-  consistencyWithStatedIntent: "Consistência com a intenção",
-  grammarFindingsCount: "Achados de português",
-  bibleReferencesCount: "Referências bíblicas identificadas",
-  attentionPointsCount: "Pontos de atenção",
-  wordCount: "Palavras na letra",
+const CONSISTENCY_LABEL: Record<string, string> = {
+  muito_consistente: "Muito consistente",
+  consistente: "Consistente",
+  parcialmente_consistente: "Parcialmente consistente",
+  precisa_revisao: "Precisa de revisão",
+  nao_foi_possivel_determinar: "Não foi possível determinar",
 };
 
 export function CompareVersions() {
   const { songId } = useParams();
+  const { user } = useAuth();
   const { song } = useSong(songId);
   const { versions } = useSongVersions(songId);
 
   const [aId, setAId] = useState<string>("");
   const [bId, setBId] = useState<string>("");
-  const [result, setResult] = useState<ComparisonResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [analysisA, setAnalysisA] = useState<AnalysisDoc | null>(null);
+  const [analysisB, setAnalysisB] = useState<AnalysisDoc | null>(null);
 
   useEffect(() => {
     if (versions.length >= 2 && !aId && !bId) {
@@ -36,15 +33,29 @@ export function CompareVersions() {
     }
   }, [versions, aId, bId]);
 
+  const versionA = versions.find((v) => v.id === aId);
+  const versionB = versions.find((v) => v.id === bId);
+
   useEffect(() => {
-    if (!songId || !aId || !bId || aId === bId) return;
-    setLoading(true);
-    setError(null);
-    callCompareVersions({ songId, versionAId: aId, versionBId: bId })
-      .then(setResult)
-      .catch((err) => setError(err instanceof Error ? err.message : "Não foi possível comparar as versões."))
-      .finally(() => setLoading(false));
-  }, [songId, aId, bId]);
+    if (!user || !songId || !versionA?.currentAnalysisId) {
+      setAnalysisA(null);
+      return;
+    }
+    getAnalysis(user.uid, songId, versionA.currentAnalysisId).then((a) => setAnalysisA(a));
+  }, [user, songId, versionA?.currentAnalysisId]);
+
+  useEffect(() => {
+    if (!user || !songId || !versionB?.currentAnalysisId) {
+      setAnalysisB(null);
+      return;
+    }
+    getAnalysis(user.uid, songId, versionB.currentAnalysisId).then((b) => setAnalysisB(b));
+  }, [user, songId, versionB?.currentAnalysisId]);
+
+  const tokens = useMemo(
+    () => (versionA && versionB ? diffWords(versionA.lyrics, versionB.lyrics) : []),
+    [versionA, versionB]
+  );
 
   if (!song) {
     return (
@@ -95,18 +106,13 @@ export function CompareVersions() {
         </label>
       </div>
 
-      {loading && (
-        <p className="mt-6 text-sm text-ink-700/60 dark:text-parchment-100/50">Comparando...</p>
-      )}
-      {error && <p className="mt-6 text-sm text-red-600 dark:text-red-400">{error}</p>}
-
-      {result && (
+      {versionA && versionB && (
         <>
           <section className="mt-6">
             <h2 className="mb-2 text-sm font-semibold">O que mudou no texto</h2>
             <div className="rounded-xl border border-ink-800/10 bg-white/60 p-4 text-sm leading-relaxed dark:border-parchment-50/10 dark:bg-ink-900/50">
               <p className="whitespace-pre-wrap">
-                {result.diff.map((t, i) => (
+                {tokens.map((t, i) => (
                   <span
                     key={i}
                     className={
@@ -139,20 +145,48 @@ export function CompareVersions() {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(result.dimensions).map(([key, value]) => (
-                    <tr key={key} className="border-t border-ink-800/10 dark:border-parchment-50/10">
-                      <td className="py-1.5 pr-2 font-medium">{DIMENSION_LABEL[key] ?? key}</td>
-                      <td className="py-1.5 pr-2">{String(value.a ?? "—")}</td>
-                      <td className="py-1.5">{String(value.b ?? "—")}</td>
-                    </tr>
-                  ))}
+                  <Row
+                    label="Consistência com a intenção"
+                    a={analysisA ? CONSISTENCY_LABEL[analysisA.result.overview.consistencyWithStatedIntent] : "sem análise"}
+                    b={analysisB ? CONSISTENCY_LABEL[analysisB.result.overview.consistencyWithStatedIntent] : "sem análise"}
+                  />
+                  <Row
+                    label="Achados de português"
+                    a={analysisA ? String(analysisA.result.grammarFindings.length) : "—"}
+                    b={analysisB ? String(analysisB.result.grammarFindings.length) : "—"}
+                  />
+                  <Row
+                    label="Referências bíblicas identificadas"
+                    a={analysisA ? String(analysisA.result.bibleReferences.length) : "—"}
+                    b={analysisB ? String(analysisB.result.bibleReferences.length) : "—"}
+                  />
+                  <Row
+                    label="Pontos de atenção"
+                    a={analysisA ? String(analysisA.result.overview.attentionPoints.length) : "—"}
+                    b={analysisB ? String(analysisB.result.overview.attentionPoints.length) : "—"}
+                  />
+                  <Row
+                    label="Palavras na letra"
+                    a={String(versionA.lyrics.split(/\s+/).filter(Boolean).length)}
+                    b={String(versionB.lyrics.split(/\s+/).filter(Boolean).length)}
+                  />
+                  <Row label="Aprovada" a={versionA.approved ? "Sim" : "Não"} b={versionB.approved ? "Sim" : "Não"} />
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-xs text-ink-700/50 dark:text-parchment-100/40">{result.note}</p>
           </section>
         </>
       )}
     </div>
+  );
+}
+
+function Row({ label, a, b }: { label: string; a: string; b: string }) {
+  return (
+    <tr className="border-t border-ink-800/10 dark:border-parchment-50/10">
+      <td className="py-1.5 pr-2 font-medium">{label}</td>
+      <td className="py-1.5 pr-2">{a}</td>
+      <td className="py-1.5">{b}</td>
+    </tr>
   );
 }

@@ -42,7 +42,7 @@ export function About() {
           Modo demonstração
         </h2>
         <p>
-          Se as Cloud Functions não tiverem uma chave de API de IA configurada, a análise roda em
+          Se o Worker de análise não tiver o binding de Workers AI disponível, a análise roda em
           modo demonstração: o resultado tem a mesma estrutura de uma análise real, mas o conteúdo
           é um exemplo fixo, claramente identificado como tal.
         </p>
@@ -51,16 +51,18 @@ export function About() {
           Como a análise funciona
         </h2>
         <p>
-          A letra nunca é analisada no seu navegador nem por um servidor de terceiros direto: uma
-          Cloud Function autenticada lê a versão salva no Firestore, confirma que ela pertence à
-          sua conta, e só então chama o provedor de IA — a chave de API nunca fica no frontend.
+          A letra é enviada, junto com seu token de login do Firebase, a um Cloudflare Worker que
+          confirma que o token é válido e então roda a análise usando Cloudflare Workers AI —
+          nenhuma chave de API de IA é necessária, e o Worker nunca acessa seu banco de dados: ele
+          só processa o texto enviado e devolve o resultado, que o próprio app salva no Firestore.
         </p>
 
         <h2 className="mt-2 font-medium text-ink-950 dark:text-parchment-50">Privacidade</h2>
         <p>
-          Suas composições ficam privadas por padrão, protegidas por regras do Firestore e do
-          Storage que restringem cada leitura e escrita à sua própria conta. Este app não
-          constitui registro legal de direitos autorais.
+          Suas composições ficam privadas por padrão, protegidas por regras do Firestore que
+          restringem cada leitura e escrita à sua própria conta. Esta versão gratuita não usa
+          Firebase Storage nem qualquer outro armazenamento de arquivos — não há upload de áudio,
+          PDF ou DOCX. Este app não constitui registro legal de direitos autorais.
         </p>
 
         <h2 className="mt-2 font-medium text-ink-950 dark:text-parchment-50">

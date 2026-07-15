@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "verbo-cancao-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-11-01",
+  "ai": {
+    "binding": "AI"
+  },
+  "vars": {
+    "FIREBASE_PROJECT_ID": "verbo-cancao-free",
+    "ALLOWED_ORIGIN": "*"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

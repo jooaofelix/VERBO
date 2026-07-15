@@ -1,12 +1,13 @@
 import type { RevisionMode, SongContextInput, SongSection } from "@verbo/shared";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { callAnalyzeLyrics } from "../repositories/analysesRepository.js";
+import { saveAnalysisResult } from "../repositories/analysesRepository.js";
 import { createSong } from "../repositories/songsRepository.js";
 import { createVersion } from "../repositories/versionsRepository.js";
 import { ContextForm } from "../components/ContextForm.js";
 import { LyricsEditor } from "../components/LyricsEditor.js";
 import { useAuth } from "../hooks/useAuth.js";
+import { analyzeLyrics } from "../services/worker/client.js";
 
 const REVISION_MODES: Array<{ value: RevisionMode; label: string; description: string }> = [
   { value: "completa", label: "Revisão completa", description: "Combina todas as análises abaixo." },
@@ -63,11 +64,17 @@ export function NewAnalysis() {
         context,
       });
 
-      // The callable reads the version's lyrics/context straight from
-      // Firestore (never trusting a client-sent copy) and persists the
-      // result there too — this call just waits for that to finish before
-      // navigating, it isn't the source of truth for what gets saved.
-      await callAnalyzeLyrics({ songId, versionId, revisionMode });
+      // The Worker is stateless — it only verifies the ID token and runs
+      // the analysis, it never touches Firestore. The client persists the
+      // result itself, exactly like any other write in this app.
+      const { mode, result } = await analyzeLyrics({
+        lyrics,
+        sections,
+        context,
+        revisionMode,
+        bibleTranslationPreference: "dominio_publico_almeida",
+      });
+      await saveAnalysisResult(user.uid, songId, versionId, mode, result);
 
       navigate(`/musicas/${songId}/versoes/${versionId}`);
     } catch (err) {

@@ -1,23 +1,18 @@
-import type { FinalReport } from "@verbo/shared";
-import { useEffect, useState } from "react";
+import type { AnalysisResult } from "@verbo/shared";
+import { useMemo, useState } from "react";
 import {
-  buildDocxBlob,
-  buildPdfBlob,
   copyReportToClipboard,
   downloadReportAsDocx,
   downloadReportAsPdf,
   downloadReportAsTxt,
 } from "../../lib/export.js";
-import { callGenerateReport } from "../../repositories/analysesRepository.js";
-import { uploadUserFile } from "../../services/firebase/storage.js";
-import { processUploadedFile } from "../../repositories/filesRepository.js";
+import { buildFinalReport } from "../../lib/report.js";
 import type { SongDoc, VersionDoc, WithId } from "../../types/firestore.js";
 
 interface Props {
-  uid: string;
   song: WithId<SongDoc>;
   version: WithId<VersionDoc>;
-  analysisId: string;
+  result: AnalysisResult;
 }
 
 function slugify(text: string): string {
@@ -29,56 +24,10 @@ function slugify(text: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-export function ReportTab({ uid, song, version, analysisId }: Props) {
-  const [report, setReport] = useState<FinalReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function ReportTab({ song, version, result }: Props) {
   const [copied, setCopied] = useState(false);
-  const [cloudSaveStatus, setCloudSaveStatus] = useState<"" | "saving" | "saved" | "error">("");
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    callGenerateReport({ songId: song.id, versionId: version.id, analysisId })
-      .then(({ report: generated }) => {
-        if (!cancelled) setReport(generated);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Não foi possível gerar o relatório.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [song.id, version.id, analysisId]);
-
-  if (loading) {
-    return <p className="text-sm text-ink-700/60 dark:text-parchment-100/50">Gerando relatório...</p>;
-  }
-  if (error || !report) {
-    return <p className="text-sm text-red-600 dark:text-red-400">{error}</p>;
-  }
-
-  const filename = `${song.title || "composicao"}-${version.versionName}`;
-  const safeFilename = slugify(filename);
-
-  async function handleSaveCopyToCloud(kind: "pdf" | "docx") {
-    setCloudSaveStatus("saving");
-    try {
-      const blob = kind === "pdf" ? await buildPdfBlob(report!) : await buildDocxBlob(report!);
-      const file = new File([blob], `${safeFilename}.${kind}`, { type: blob.type });
-      const { storagePath } = await uploadUserFile(uid, kind, file, song.id);
-      await processUploadedFile({ storagePath, songId: song.id, kind });
-      setCloudSaveStatus("saved");
-    } catch {
-      setCloudSaveStatus("error");
-    }
-  }
+  const report = useMemo(() => buildFinalReport(song, version, result), [song, version, result]);
+  const safeFilename = slugify(`${song.title || "composicao"}-${version.versionName}`);
 
   return (
     <div className="flex flex-col gap-5">
@@ -117,42 +66,9 @@ export function ReportTab({ uid, song, version, analysisId }: Props) {
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => handleSaveCopyToCloud("pdf")}
-          disabled={cloudSaveStatus === "saving"}
-          className="rounded-lg border border-ink-800/15 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-parchment-50/15"
-        >
-          Salvar cópia em PDF na nuvem
-        </button>
-        <button
-          type="button"
-          onClick={() => handleSaveCopyToCloud("docx")}
-          disabled={cloudSaveStatus === "saving"}
-          className="rounded-lg border border-ink-800/15 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-parchment-50/15"
-        >
-          Salvar cópia em DOCX na nuvem
-        </button>
-        {cloudSaveStatus === "saving" && (
-          <span className="text-xs text-ink-700/60 dark:text-parchment-100/50">Enviando...</span>
-        )}
-        {cloudSaveStatus === "saved" && (
-          <span className="text-xs text-emerald-700 dark:text-emerald-400">
-            Salvo no Firebase Storage.
-          </span>
-        )}
-        {cloudSaveStatus === "error" && (
-          <span className="text-xs text-red-600 dark:text-red-400">
-            Não foi possível salvar a cópia na nuvem.
-          </span>
-        )}
-      </div>
-
       <p className="text-xs text-ink-700/50 dark:text-parchment-100/40">
-        Os botões "Baixar" salvam um arquivo direto no seu dispositivo. "Salvar cópia na nuvem"
-        também envia o arquivo ao Firebase Storage, vinculado à sua conta, para acesso futuro em
-        outro dispositivo.
+        Esta versão gratuita não envia arquivos para nenhum armazenamento em nuvem — os botões
+        acima salvam um arquivo diretamente no seu dispositivo.
       </p>
 
       <div className="rounded-xl border border-ink-800/10 bg-white/60 p-4 text-sm dark:border-parchment-50/10 dark:bg-ink-900/50">

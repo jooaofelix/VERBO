@@ -1,6 +1,13 @@
-import type { AnalysisResult, FinalReport, RevisionMode, SongSection } from "@verbo/shared";
-import { doc, getDoc, onSnapshot, type Unsubscribe } from "firebase/firestore";
-import { callFunction } from "../services/firebase/functions.js";
+import type { AnalysisResult } from "@verbo/shared";
+import {
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  serverTimestamp,
+  writeBatch,
+  type Unsubscribe,
+} from "firebase/firestore";
 import { db } from "../services/firebase/firestore.js";
 import type { AnalysisDoc, WithId } from "../types/firestore.js";
 
@@ -28,36 +35,46 @@ export function subscribeToAnalysis(
   });
 }
 
-// ---- Cloud Functions callables (analysis is always computed server-side) ----
+/**
+ * The Cloudflare Worker never touches Firestore — it just returns the
+ * analysis result over HTTP. The authenticated client is responsible for
+ * persisting it, exactly like any other write in this app, subject to
+ * firestore.rules. This writes the new analysis doc and updates the
+ * parent version/song docs in a single atomic batch.
+ */
+export async function saveAnalysisResult(
+  uid: string,
+  songId: string,
+  versionId: string,
+  mode: "live" | "demo",
+  result: AnalysisResult
+): Promise<string> {
+  const batch = writeBatch(db);
 
-export async function callAnalyzeLyrics(input: {
-  songId: string;
-  versionId: string;
-  revisionMode?: RevisionMode;
-}): Promise<{ mode: "live" | "demo"; analysisId: string; result: AnalysisResult }> {
-  return callFunction("analyzeLyrics", input);
-}
+  const analysisRef = doc(collection(db, "users", uid, "songs", songId, "analyses"));
+  batch.set(analysisRef, {
+    versionId,
+    mode,
+    result,
+    userId: uid,
+    status: "completed",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 
-export async function callSuggestSections(lyrics: string): Promise<{ sections: SongSection[] }> {
-  return callFunction("suggestSections", { lyrics });
-}
+  const versionRef = doc(db, "users", uid, "songs", songId, "versions", versionId);
+  batch.update(versionRef, {
+    analysisStatus: "completed",
+    currentAnalysisId: analysisRef.id,
+    updatedAt: serverTimestamp(),
+  });
 
-export async function callCompareVersions(input: {
-  songId: string;
-  versionAId: string;
-  versionBId: string;
-}): Promise<{
-  diff: Array<{ text: string; type: "same" | "added" | "removed" }>;
-  dimensions: Record<string, { a: unknown; b: unknown }>;
-  note: string;
-}> {
-  return callFunction("compareVersions", input);
-}
+  const songRef = doc(db, "users", uid, "songs", songId);
+  batch.update(songRef, {
+    lastAnalysisSummary: result.overview.perceivedCentralMessage,
+    updatedAt: serverTimestamp(),
+  });
 
-export async function callGenerateReport(input: {
-  songId: string;
-  versionId: string;
-  analysisId: string;
-}): Promise<{ reportId: string; report: FinalReport }> {
-  return callFunction("generateReport", input);
+  await batch.commit();
+  return analysisRef.id;
 }

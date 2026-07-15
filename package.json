@@ -4,19 +4,19 @@
   "version": "0.1.0",
   "workspaces": [
     "shared",
-    "functions",
+    "worker",
     "web"
   ],
   "scripts": {
     "postinstall": "npm run build -w shared",
-    "dev": "npm run build -w shared && concurrently -k -n functions,web -c blue,green \"npm run serve -w functions\" \"npm run dev -w web\"",
-    "build": "npm run build -w shared && npm run build -w functions && npm run build -w web",
-    "lint": "npm run lint -w functions && npm run lint -w web",
-    "test": "npm run build -w shared && npm run test -w shared && npm run test -w functions && npm run test -w web",
-    "typecheck": "npm run build -w shared && npm run typecheck -w shared && npm run typecheck -w functions && npm run typecheck -w web",
-    "emulators": "npm run build -w shared && npm run build -w functions && firebase emulators:start",
-    "test:rules": "firebase emulators:exec --project demo-verbo-test --non-interactive --only firestore,storage \"npm run test:rules -w functions\"",
-    "test:e2e": "npm run build -w shared && npm run build -w functions && firebase emulators:exec --project demo-verbo-test --non-interactive --only auth,firestore,storage,functions \"node functions/scripts/smoke-test.mjs\""
+    "dev": "npm run build -w shared && concurrently -k -n worker,web -c blue,green \"npm run dev -w worker\" \"npm run dev -w web\"",
+    "build": "npm run build -w shared && npm run build -w worker && npm run build -w web",
+    "lint": "npm run lint -w worker && npm run lint -w web",
+    "test": "npm run build -w shared && npm run test -w shared && npm run test -w worker && npm run test -w web",
+    "typecheck": "npm run build -w shared && npm run typecheck -w shared && npm run typecheck -w worker && npm run typecheck -w web",
+    "emulators": "npm run build -w shared && firebase emulators:start --only auth,firestore",
+    "test:rules": "firebase emulators:exec --project demo-verbo-test --non-interactive --only firestore \"npm run test:rules -w worker\"",
+    "test:e2e": "npm run build -w shared && firebase emulators:exec --project demo-verbo-test --non-interactive --only auth,firestore \"node worker/scripts/e2e.mjs\""
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

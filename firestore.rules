@@ -16,13 +16,6 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['userId', 'createdAt', 'updatedAt']);
     }
 
-    // Cloud Functions use the Admin SDK, which always bypasses these rules —
-    // so "deny all client writes" on a collection really means "only our
-    // own server code can write here", not "nobody can write here".
-    function serverWriteOnly() {
-      return false;
-    }
-
     // ---- users/{userId} — profile document ----
     match /users/{userId} {
       allow read: if isOwner(userId);
@@ -58,10 +51,19 @@ service cloud.firestore {
           allow delete: if isOwner(userId);
         }
 
-        // ---- .../analyses/{analysisId} — written only by Cloud Functions ----
+        // ---- .../analyses/{analysisId} ----
+        // There is no trusted server in this MVP (no Cloud Functions): the
+        // Cloudflare Worker that runs the AI analysis never touches
+        // Firestore, so the authenticated owner writes the result directly,
+        // the same way it writes songs/versions. Isolation is still fully
+        // enforced — nobody but the owner can read or write their analyses.
         match /analyses/{analysisId} {
           allow read: if isOwner(userId);
-          allow write: if serverWriteOnly();
+          allow create: if isOwner(userId)
+            && hasOwnerFields(userId)
+            && request.resource.data.keys().hasAll(['versionId', 'mode', 'result']);
+          allow update: if isOwner(userId) && request.resource.data.userId == resource.data.userId;
+          allow delete: if isOwner(userId);
         }
 
         // ---- .../references/{referenceId} — user's own saved/favorited references ----
@@ -87,33 +89,20 @@ service cloud.firestore {
             && request.resource.data.text.size() <= 5000;
           allow delete: if isOwner(userId);
         }
-
-        // ---- .../attachments/{attachmentId} — metadata only, written by Cloud Functions ----
-        match /attachments/{attachmentId} {
-          allow read: if isOwner(userId);
-          allow write: if serverWriteOnly();
-        }
       }
 
       // ---- users/{userId}/settings/{documentId} ----
       match /settings/{documentId} {
         allow read: if isOwner(userId);
-        // rateLimit_* counters are only ever written by Cloud Functions
-        // transactions — a client "topping up" its own quota would defeat
-        // the point of the limit.
-        allow write: if isOwner(userId) && !documentId.matches('rateLimit_.*');
+        allow write: if isOwner(userId);
       }
 
-      // ---- users/{userId}/reports/{reportId} — written only by Cloud Functions ----
+      // ---- users/{userId}/reports/{reportId} ----
       match /reports/{reportId} {
         allow read: if isOwner(userId);
-        allow write: if serverWriteOnly();
-      }
-
-      // ---- users/{userId}/files/{fileId} — written only by Cloud Functions ----
-      match /files/{fileId} {
-        allow read: if isOwner(userId);
-        allow write: if serverWriteOnly();
+        allow create: if isOwner(userId) && hasOwnerFields(userId);
+        allow update: if isOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isOwner(userId);
       }
     }
 

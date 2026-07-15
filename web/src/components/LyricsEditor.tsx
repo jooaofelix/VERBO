@@ -1,6 +1,6 @@
 import type { SongSection } from "@verbo/shared";
 import { useState } from "react";
-import { callSuggestSections } from "../repositories/analysesRepository.js";
+import { suggestSections } from "../services/worker/client.js";
 
 interface Props {
   lyrics: string;
@@ -31,7 +31,7 @@ export function LyricsEditor({ lyrics, onLyricsChange, sections, onSectionsChang
     setLoading(true);
     setError(null);
     try {
-      const { sections: suggested } = await callSuggestSections(lyrics);
+      const { sections: suggested } = await suggestSections(lyrics);
       onSectionsChange(suggested);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível sugerir a divisão em seções.");

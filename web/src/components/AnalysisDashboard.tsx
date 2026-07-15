@@ -32,11 +32,10 @@ interface Props {
   uid: string;
   song: WithId<SongDoc>;
   version: WithId<VersionDoc>;
-  analysisId: string;
   result: AnalysisResult;
 }
 
-export function AnalysisDashboard({ uid, song, version, analysisId, result }: Props) {
+export function AnalysisDashboard({ uid, song, version, result }: Props) {
   const [tab, setTab] = useState<Tab>("Visão geral");
   const decisions = version.findingDecisions ?? {};
 
@@ -89,9 +88,7 @@ export function AnalysisDashboard({ uid, song, version, analysisId, result }: Pr
         <SuggestionsTab result={result} decisions={decisions} onDecide={handleDecide} />
       )}
       {tab === "Perguntas" && <QuestionsTab result={result} />}
-      {tab === "Relatório" && (
-        <ReportTab uid={uid} song={song} version={version} analysisId={analysisId} />
-      )}
+      {tab === "Relatório" && <ReportTab song={song} version={version} result={result} />}
     </div>
   );
 }
