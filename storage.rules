@@ -1,0 +1,37 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isAllowedType() {
+      return request.resource.contentType.matches('audio/.*')
+        || request.resource.contentType.matches('image/(png|jpeg|jpg|webp)')
+        || request.resource.contentType == 'application/pdf'
+        || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        || request.resource.contentType == 'text/plain';
+    }
+
+    function isWithinSizeLimit() {
+      // 50MB ceiling — covers demo/voice-and-guitar recordings and exported
+      // reports without opening the door to arbitrary large uploads.
+      return request.resource.size < 50 * 1024 * 1024;
+    }
+
+    // Everything a user owns lives under users/{uid}/ — no path outside
+    // that prefix is readable or writable by anyone, and no file under it
+    // is public by default.
+    match /users/{userId}/{allPaths=**} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && isAllowedType() && isWithinSizeLimit();
+      allow delete: if isOwner(userId);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

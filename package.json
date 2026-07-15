@@ -4,17 +4,22 @@
   "version": "0.1.0",
   "workspaces": [
     "shared",
-    "server",
+    "functions",
     "web"
   ],
   "scripts": {
-    "dev": "concurrently -k -n server,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
-    "build": "npm run build -w shared && npm run build -w server && npm run build -w web",
-    "lint": "npm run lint -w server && npm run lint -w web",
-    "test": "npm run test -w shared && npm run test -w server && npm run test -w web",
-    "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w web"
+    "postinstall": "npm run build -w shared",
+    "dev": "npm run build -w shared && concurrently -k -n functions,web -c blue,green \"npm run serve -w functions\" \"npm run dev -w web\"",
+    "build": "npm run build -w shared && npm run build -w functions && npm run build -w web",
+    "lint": "npm run lint -w functions && npm run lint -w web",
+    "test": "npm run build -w shared && npm run test -w shared && npm run test -w functions && npm run test -w web",
+    "typecheck": "npm run build -w shared && npm run typecheck -w shared && npm run typecheck -w functions && npm run typecheck -w web",
+    "emulators": "npm run build -w shared && npm run build -w functions && firebase emulators:start",
+    "test:rules": "firebase emulators:exec --project demo-verbo-test --non-interactive --only firestore,storage \"npm run test:rules -w functions\"",
+    "test:e2e": "npm run build -w shared && npm run build -w functions && firebase emulators:exec --project demo-verbo-test --non-interactive --only auth,firestore,storage,functions \"node functions/scripts/smoke-test.mjs\""
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "firebase-tools": "^13.29.1"
   }
 }

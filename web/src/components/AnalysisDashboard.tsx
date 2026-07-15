@@ -1,7 +1,7 @@
 import type { AnalysisResult } from "@verbo/shared";
 import { useState } from "react";
-import type { Song, SongVersion } from "../state/types.js";
-import { useSongsStore } from "../state/store.js";
+import { setFindingDecision } from "../repositories/versionsRepository.js";
+import type { SongDoc, VersionDoc, WithId } from "../types/firestore.js";
 import { BibleTheologyTab } from "./analysis/BibleTheologyTab.js";
 import { CoherenceTab } from "./analysis/CoherenceTab.js";
 import { CompositionTab } from "./analysis/CompositionTab.js";
@@ -29,15 +29,20 @@ const TABS = [
 type Tab = (typeof TABS)[number];
 
 interface Props {
-  song: Song;
-  version: SongVersion;
+  uid: string;
+  song: WithId<SongDoc>;
+  version: WithId<VersionDoc>;
+  analysisId: string;
   result: AnalysisResult;
 }
 
-export function AnalysisDashboard({ song, version, result }: Props) {
+export function AnalysisDashboard({ uid, song, version, analysisId, result }: Props) {
   const [tab, setTab] = useState<Tab>("Visão geral");
-  const setFindingDecision = useSongsStore((s) => s.setFindingDecision);
   const decisions = version.findingDecisions ?? {};
+
+  function handleDecide(findingId: string, decision: "accepted" | "ignored" | undefined) {
+    void setFindingDecision(uid, song.id, version.id, findingId, decision);
+  }
 
   return (
     <div>
@@ -72,7 +77,7 @@ export function AnalysisDashboard({ song, version, result }: Props) {
           sections={version.sections}
           findings={result.findings}
           decisions={decisions}
-          onDecide={(id, decision) => setFindingDecision(song.id, version.id, id, decision)}
+          onDecide={handleDecide}
         />
       )}
       {tab === "Bíblia & Teologia" && <BibleTheologyTab result={result} />}
@@ -81,14 +86,12 @@ export function AnalysisDashboard({ song, version, result }: Props) {
       {tab === "Composição" && <CompositionTab result={result} />}
       {tab === "Congregacional" && <CongregationalTab result={result} />}
       {tab === "Sugestões" && (
-        <SuggestionsTab
-          result={result}
-          decisions={decisions}
-          onDecide={(id, decision) => setFindingDecision(song.id, version.id, id, decision)}
-        />
+        <SuggestionsTab result={result} decisions={decisions} onDecide={handleDecide} />
       )}
       {tab === "Perguntas" && <QuestionsTab result={result} />}
-      {tab === "Relatório" && <ReportTab song={song} version={version} />}
+      {tab === "Relatório" && (
+        <ReportTab uid={uid} song={song} version={version} analysisId={analysisId} />
+      )}
     </div>
   );
 }

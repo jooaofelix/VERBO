@@ -1,10 +1,12 @@
 import type { RevisionMode, SongContextInput, SongSection } from "@verbo/shared";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { analyzeLyrics, ApiError } from "../api/client.js";
+import { callAnalyzeLyrics } from "../repositories/analysesRepository.js";
+import { createSong } from "../repositories/songsRepository.js";
+import { createVersion } from "../repositories/versionsRepository.js";
 import { ContextForm } from "../components/ContextForm.js";
 import { LyricsEditor } from "../components/LyricsEditor.js";
-import { useSongsStore } from "../state/store.js";
+import { useAuth } from "../hooks/useAuth.js";
 
 const REVISION_MODES: Array<{ value: RevisionMode; label: string; description: string }> = [
   { value: "completa", label: "Revisão completa", description: "Combina todas as análises abaixo." },
@@ -24,7 +26,7 @@ const DEFAULT_CONTEXT: SongContextInput = {
 
 export function NewAnalysis() {
   const navigate = useNavigate();
-  const createSong = useSongsStore((s) => s.createSong);
+  const { user } = useAuth();
 
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -38,6 +40,7 @@ export function NewAnalysis() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!user) return;
     if (!lyrics.trim()) {
       setError("Cole ou escreva a letra antes de analisar.");
       return;
@@ -46,26 +49,29 @@ export function NewAnalysis() {
     setError(null);
 
     try {
-      const { songId, versionId } = createSong(title, author || undefined, {
-        lyrics,
-        sections,
-        context,
-      });
-
-      const response = await analyzeLyrics({
-        songTitle: title || undefined,
+      const songId = await createSong(user.uid, {
+        title,
         author: author || undefined,
+        congregational: context.usageContext === "congregacional",
+        hasAudio: false,
+      });
+
+      const versionId = await createVersion(user.uid, songId, {
+        versionName: "Versão 1",
         lyrics,
         sections,
         context,
-        revisionMode,
-        bibleTranslationPreference: "dominio_publico_almeida",
       });
 
-      useSongsStore.getState().setVersionAnalysis(songId, versionId, response.result, response.mode);
+      // The callable reads the version's lyrics/context straight from
+      // Firestore (never trusting a client-sent copy) and persists the
+      // result there too — this call just waits for that to finish before
+      // navigating, it isn't the source of truth for what gets saved.
+      await callAnalyzeLyrics({ songId, versionId, revisionMode });
+
       navigate(`/musicas/${songId}/versoes/${versionId}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível concluir a análise agora.");
+      setError(err instanceof Error ? err.message : "Não foi possível concluir a análise agora.");
     } finally {
       setLoading(false);
     }

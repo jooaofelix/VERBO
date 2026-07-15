@@ -11,3 +11,10 @@ dev-dist/
 *.tsbuildinfo
 playwright-report/
 test-results/
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+.runtimeconfig.json
+emulator-data/

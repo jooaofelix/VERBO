@@ -1,0 +1,9 @@
+export { analyzeLyrics } from "./callable/analyzeLyrics.js";
+export { detectBibleReferences } from "./callable/detectBibleReferences.js";
+export { analyzeTheology } from "./callable/analyzeTheology.js";
+export { analyzeGrammar } from "./callable/analyzeGrammar.js";
+export { analyzeComposition } from "./callable/analyzeComposition.js";
+export { compareVersions } from "./callable/compareVersions.js";
+export { generateReport } from "./callable/generateReport.js";
+export { processUploadedFile } from "./callable/processUploadedFile.js";
+export { suggestSections } from "./callable/suggestSections.js";

@@ -58,12 +58,11 @@ export async function copyReportToClipboard(report: FinalReport): Promise<void> 
   await navigator.clipboard.writeText(reportToText(report));
 }
 
-export function downloadReportAsTxt(report: FinalReport, filename: string): void {
-  const blob = new Blob([reportToText(report)], { type: "text/plain;charset=utf-8" });
-  triggerDownload(blob, `${filename}.txt`);
+export function buildTxtBlob(report: FinalReport): Blob {
+  return new Blob([reportToText(report)], { type: "text/plain;charset=utf-8" });
 }
 
-export async function downloadReportAsDocx(report: FinalReport, filename: string): Promise<void> {
+export async function buildDocxBlob(report: FinalReport): Promise<Blob> {
   const { Document, HeadingLevel, Packer, Paragraph, TextRun } = await import("docx");
   const children: InstanceType<typeof Paragraph>[] = [
     new Paragraph({ text: "VERBO & CANÇÃO — Relatório de análise", heading: HeadingLevel.TITLE }),
@@ -87,11 +86,10 @@ export async function downloadReportAsDocx(report: FinalReport, filename: string
   }
 
   const doc = new Document({ sections: [{ children }] });
-  const blob = await Packer.toBlob(doc);
-  triggerDownload(blob, `${filename}.docx`);
+  return Packer.toBlob(doc);
 }
 
-export async function downloadReportAsPdf(report: FinalReport, filename: string): Promise<void> {
+export async function buildPdfBlob(report: FinalReport): Promise<Blob> {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const marginX = 40;
@@ -130,7 +128,19 @@ export async function downloadReportAsPdf(report: FinalReport, filename: string)
   writeLine("Letra original", 12, true);
   writeLine(report.originalLyrics);
 
-  doc.save(`${filename}.pdf`);
+  return doc.output("blob");
+}
+
+export function downloadReportAsTxt(report: FinalReport, filename: string): void {
+  triggerDownload(buildTxtBlob(report), `${filename}.txt`);
+}
+
+export async function downloadReportAsDocx(report: FinalReport, filename: string): Promise<void> {
+  triggerDownload(await buildDocxBlob(report), `${filename}.docx`);
+}
+
+export async function downloadReportAsPdf(report: FinalReport, filename: string): Promise<void> {
+  triggerDownload(await buildPdfBlob(report), `${filename}.pdf`);
 }
 
 function triggerDownload(blob: Blob, filename: string): void {

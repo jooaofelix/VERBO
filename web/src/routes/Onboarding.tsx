@@ -20,12 +20,12 @@ const POINTS = [
     text: "Esta versão analisa somente a letra escrita. Estimativas de prosódia e emoção são sempre indicadas como estimativas — sem melodia, tonalidade ou BPM.",
   },
   {
-    title: "Sem login, sem nuvem",
-    text: "Não há cadastro nem senha. Suas composições ficam salvas apenas neste navegador (localStorage). Limpar os dados do site apaga o histórico.",
+    title: "Sua conta, suas composições",
+    text: "Entre com Google, e-mail e senha, ou continue em modo demonstração sem criar conta. Suas composições ficam vinculadas só a você — ninguém mais tem acesso a elas.",
   },
   {
     title: "Sua letra permanece privada",
-    text: "A letra é enviada ao servidor apenas no momento da análise, para gerar o resultado — não é publicada nem compartilhada automaticamente.",
+    text: "As composições são salvas na sua conta e analisadas por funções de servidor autenticadas — nunca são publicadas, indexadas ou compartilhadas automaticamente.",
   },
 ];
 

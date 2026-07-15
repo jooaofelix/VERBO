@@ -14,11 +14,11 @@
   "dependencies": {
     "@verbo/shared": "*",
     "docx": "^9.0.2",
+    "firebase": "^11.0.2",
     "jspdf": "^2.5.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0",
-    "zustand": "^5.0.1"
+    "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",

@@ -10,12 +10,13 @@ export function About() {
           substituir a voz do autor.
         </p>
 
-        <h2 className="mt-2 font-medium text-ink-950 dark:text-parchment-50">Sem login</h2>
+        <h2 className="mt-2 font-medium text-ink-950 dark:text-parchment-50">Sua conta</h2>
         <p>
-          Não existe cadastro, senha ou conta. Cada composição e cada versão ficam salvas apenas
-          no armazenamento local (localStorage) deste navegador, neste dispositivo. Limpar os
-          dados do site, trocar de navegador ou de aparelho apaga o histórico — não há nuvem nem
-          backup automático.
+          Entre com Google, e-mail e senha, ou use o modo demonstração (uma conta anônima, sem
+          cadastro). Suas composições, versões e análises ficam salvas no Firestore, vinculadas
+          exclusivamente ao seu usuário — ninguém mais consegue ler, listar ou editar seus dados.
+          Uma conta anônima funciona normalmente, mas não pode ser recuperada em outro dispositivo
+          ou navegador (não há como "logar de volta" numa sessão anônima que foi perdida).
         </p>
 
         <h2 className="mt-2 font-medium text-ink-950 dark:text-parchment-50">Apenas texto</h2>
@@ -41,16 +42,34 @@ export function About() {
           Modo demonstração
         </h2>
         <p>
-          Se o servidor não tiver uma chave de API de IA configurada, a análise roda em modo
-          demonstração: o resultado tem a mesma estrutura de uma análise real, mas o conteúdo é um
-          exemplo fixo, claramente identificado como tal.
+          Se as Cloud Functions não tiverem uma chave de API de IA configurada, a análise roda em
+          modo demonstração: o resultado tem a mesma estrutura de uma análise real, mas o conteúdo
+          é um exemplo fixo, claramente identificado como tal.
+        </p>
+
+        <h2 className="mt-2 font-medium text-ink-950 dark:text-parchment-50">
+          Como a análise funciona
+        </h2>
+        <p>
+          A letra nunca é analisada no seu navegador nem por um servidor de terceiros direto: uma
+          Cloud Function autenticada lê a versão salva no Firestore, confirma que ela pertence à
+          sua conta, e só então chama o provedor de IA — a chave de API nunca fica no frontend.
         </p>
 
         <h2 className="mt-2 font-medium text-ink-950 dark:text-parchment-50">Privacidade</h2>
         <p>
-          Sua letra é enviada ao servidor apenas no momento em que você pede uma análise, para
-          gerar o resultado — ela não é publicada, indexada ou compartilhada automaticamente. Este
-          app não constitui registro legal de direitos autorais.
+          Suas composições ficam privadas por padrão, protegidas por regras do Firestore e do
+          Storage que restringem cada leitura e escrita à sua própria conta. Este app não
+          constitui registro legal de direitos autorais.
+        </p>
+
+        <h2 className="mt-2 font-medium text-ink-950 dark:text-parchment-50">
+          Funcionamento offline
+        </h2>
+        <p>
+          O Firestore mantém um cache local no navegador: você consegue ver dados já carregados e
+          continuar editando uma letra mesmo sem internet. As alterações sincronizam automaticamente
+          quando a conexão voltar — o indicador de salvamento mostra "offline" enquanto isso.
         </p>
 
         <h2 className="mt-2 font-medium text-ink-950 dark:text-parchment-50">Limitações</h2>
@@ -58,7 +77,7 @@ export function About() {
           <li>Pluralidade teológica é sinalizada, mas não substitui aconselhamento pastoral.</li>
           <li>Estimativas de prosódia e emoção podem mudar completamente com melodia real.</li>
           <li>O conjunto de versículos com texto disponível é pequeno e não cobre toda a Bíblia.</li>
-          <li>Não há backup em nuvem: exporte o relatório se quiser guardar uma cópia externa.</li>
+          <li>Uma conta anônima (modo demonstração) não pode ser recuperada se você perder a sessão.</li>
         </ul>
       </section>
     </div>

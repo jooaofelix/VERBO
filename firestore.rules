@@ -1,0 +1,125 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasOwnerFields(userId) {
+      return request.resource.data.userId == userId
+        && request.resource.data.keys().hasAll(['userId', 'createdAt', 'updatedAt']);
+    }
+
+    // Cloud Functions use the Admin SDK, which always bypasses these rules —
+    // so "deny all client writes" on a collection really means "only our
+    // own server code can write here", not "nobody can write here".
+    function serverWriteOnly() {
+      return false;
+    }
+
+    // ---- users/{userId} — profile document ----
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['createdAt', 'updatedAt']);
+      allow update: if isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['displayName', 'email', 'photoURL', 'updatedAt']);
+      allow delete: if isOwner(userId);
+
+      // ---- users/{userId}/songs/{songId} ----
+      match /songs/{songId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && hasOwnerFields(userId)
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 300;
+        allow update: if isOwner(userId)
+          && request.resource.data.userId == resource.data.userId
+          && (!('title' in request.resource.data) || request.resource.data.title.size() <= 300);
+        allow delete: if isOwner(userId);
+
+        // ---- .../versions/{versionId} ----
+        match /versions/{versionId} {
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId)
+            && hasOwnerFields(userId)
+            && request.resource.data.lyrics is string
+            && request.resource.data.lyrics.size() <= 20000;
+          allow update: if isOwner(userId)
+            && request.resource.data.userId == resource.data.userId
+            && (!('lyrics' in request.resource.data) || request.resource.data.lyrics.size() <= 20000);
+          allow delete: if isOwner(userId);
+        }
+
+        // ---- .../analyses/{analysisId} — written only by Cloud Functions ----
+        match /analyses/{analysisId} {
+          allow read: if isOwner(userId);
+          allow write: if serverWriteOnly();
+        }
+
+        // ---- .../references/{referenceId} — user's own saved/favorited references ----
+        match /references/{referenceId} {
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId)
+            && hasOwnerFields(userId)
+            && request.resource.data.referenceLabel is string
+            && request.resource.data.referenceLabel.size() <= 200;
+          allow update: if isOwner(userId) && request.resource.data.userId == resource.data.userId;
+          allow delete: if isOwner(userId);
+        }
+
+        // ---- .../comments/{commentId} ----
+        match /comments/{commentId} {
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId)
+            && hasOwnerFields(userId)
+            && request.resource.data.text is string
+            && request.resource.data.text.size() <= 5000;
+          allow update: if isOwner(userId)
+            && request.resource.data.userId == resource.data.userId
+            && request.resource.data.text.size() <= 5000;
+          allow delete: if isOwner(userId);
+        }
+
+        // ---- .../attachments/{attachmentId} — metadata only, written by Cloud Functions ----
+        match /attachments/{attachmentId} {
+          allow read: if isOwner(userId);
+          allow write: if serverWriteOnly();
+        }
+      }
+
+      // ---- users/{userId}/settings/{documentId} ----
+      match /settings/{documentId} {
+        allow read: if isOwner(userId);
+        // rateLimit_* counters are only ever written by Cloud Functions
+        // transactions — a client "topping up" its own quota would defeat
+        // the point of the limit.
+        allow write: if isOwner(userId) && !documentId.matches('rateLimit_.*');
+      }
+
+      // ---- users/{userId}/reports/{reportId} — written only by Cloud Functions ----
+      match /reports/{reportId} {
+        allow read: if isOwner(userId);
+        allow write: if serverWriteOnly();
+      }
+
+      // ---- users/{userId}/files/{fileId} — written only by Cloud Functions ----
+      match /files/{fileId} {
+        allow read: if isOwner(userId);
+        allow write: if serverWriteOnly();
+      }
+    }
+
+    // Everything else is private by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
