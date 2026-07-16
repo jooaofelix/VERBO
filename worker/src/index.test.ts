@@ -177,7 +177,7 @@ describe("worker fetch handler", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns 504 with a Portuguese message when the AI binding times out on both attempts", async () => {
+  it("returns 504 with a Portuguese message when 'revisão rápida' times out on both attempts", async () => {
     const aiEnv: Env = {
       ...env,
       AI: { run: vi.fn().mockRejectedValue(new Error("3046: Request timeout")) } as unknown as Ai,
@@ -186,12 +186,34 @@ describe("worker fetch handler", () => {
       new Request("https://worker.example/analyze", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ lyrics: "Tu és fiel", context: {} }),
+        body: JSON.stringify({ lyrics: "Tu és fiel", context: {}, revisionMode: "rapida" }),
       }),
       aiEnv
     );
     expect(res.status).toBe(504);
     const body = (await res.json()) as { error: string };
-    expect(body.error).toContain("demorou mais");
+    expect(body.error).toBe("A análise demorou mais que o esperado. Tente novamente em alguns instantes.");
+  });
+
+  it("returns 200 with a partial report for 'revisão completa' even if every area call times out", async () => {
+    const aiEnv: Env = {
+      ...env,
+      AI: { run: vi.fn().mockRejectedValue(new Error("3046: Request timeout")) } as unknown as Ai,
+    };
+    const res = await worker.fetch(
+      new Request("https://worker.example/analyze", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ lyrics: "Tu és fiel", context: {}, revisionMode: "completa" }),
+      }),
+      aiEnv
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      mode: string;
+      result: { sectionStatus: Record<string, { status: string }> };
+    };
+    expect(body.mode).toBe("live");
+    expect(Object.values(body.result.sectionStatus).every((s) => s.status === "indisponivel")).toBe(true);
   });
 });

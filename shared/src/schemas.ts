@@ -24,6 +24,11 @@ export const HighlightCategorySchema = z.enum([
   "congregational",
 ]);
 
+export const SectionStatusValueSchema = z.object({
+  status: z.enum(["ok", "indisponivel"]),
+  mensagem: z.string().optional(),
+});
+
 export const AnalysisFindingSchema = z.object({
   id: z.string(),
   category: HighlightCategorySchema,
@@ -590,6 +595,15 @@ export const AnalysisResultSchema = z.object({
   findings: z.array(AnalysisFindingSchema).default([]),
   limitations: z.array(z.string()).default([]),
   disclaimers: z.array(z.string()).default([]),
+  /**
+   * Per-area availability for revisionMode "completa" (and the individual
+   * area modes), keyed by area ("biblica_teologica" | "portugues" |
+   * "composicao" | "congregacional"). Only areas that could not be produced
+   * in time appear here — a fully successful analysis has an empty object.
+   * Lets the UI show a partial report instead of failing outright when one
+   * area of a multi-call analysis times out.
+   */
+  sectionStatus: z.record(z.string(), SectionStatusValueSchema).default({}),
 });
 
 /**
@@ -615,6 +629,7 @@ export const AIProducedAnalysisSchema = z.object({
   findings: z.array(AnalysisFindingSchema).default([]),
   limitations: z.array(z.string()).default([]),
   disclaimers: z.array(z.string()).default([]),
+  sectionStatus: z.record(z.string(), SectionStatusValueSchema).default({}),
 });
 
 export const AnalyzeResponseSchema = z.object({

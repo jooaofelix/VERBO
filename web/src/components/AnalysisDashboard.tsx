@@ -35,9 +35,19 @@ interface Props {
   result: AnalysisResult;
 }
 
+const AREA_LABELS: Record<string, string> = {
+  biblica_teologica: "Bíblia & Teologia",
+  portugues: "Português",
+  composicao: "Composição",
+  congregacional: "Congregacional",
+};
+
 export function AnalysisDashboard({ uid, song, version, result }: Props) {
   const [tab, setTab] = useState<Tab>("Visão geral");
   const decisions = version.findingDecisions ?? {};
+  const unavailableSections = Object.entries(result.sectionStatus ?? {}).filter(
+    ([, s]) => s.status === "indisponivel"
+  );
 
   function handleDecide(findingId: string, decision: "accepted" | "ignored" | undefined) {
     void setFindingDecision(uid, song.id, version.id, findingId, decision);
@@ -50,6 +60,19 @@ export function AnalysisDashboard({ uid, song, version, result }: Props) {
           {result.disclaimers.map((d, i) => (
             <p key={i}>{d}</p>
           ))}
+        </div>
+      )}
+
+      {unavailableSections.length > 0 && (
+        <div className="mb-4 flex flex-col gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+          <p className="font-medium">Análise parcial</p>
+          <p>
+            {unavailableSections
+              .map(([area]) => AREA_LABELS[area] ?? area)
+              .join(", ")}{" "}
+            demorou mais que o esperado e não pôde ser concluída agora. As demais partes desta
+            análise estão completas — rode a análise novamente para tentar completar o restante.
+          </p>
         </div>
       )}
 

@@ -16,6 +16,7 @@ import {
   FindingSeveritySchema,
   HighlightCategorySchema,
   RevisionModeSchema,
+  SectionStatusValueSchema,
   TheologicalTraditionSchema,
   DesiredChangeLevelSchema,
   FinalReportSchema,
@@ -52,6 +53,7 @@ export type CongregationalAnalysis = z.infer<typeof CongregationalAnalysisSchema
 export type CoherenceAnalysis = z.infer<typeof CoherenceAnalysisSchema>;
 export type OverviewSummary = z.infer<typeof OverviewSummarySchema>;
 export type ComposerQuestion = z.infer<typeof ComposerQuestionSchema>;
+export type SectionStatusValue = z.infer<typeof SectionStatusValueSchema>;
 export type SongContextInput = z.infer<typeof SongContextInputSchema>;
 export type AnalyzeRequest = z.infer<typeof AnalyzeRequestSchema>;
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;

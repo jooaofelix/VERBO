@@ -135,6 +135,7 @@ export class DemoAIProvider implements AIAnalysisProvider {
         `Esta resposta é um exemplo estático (modo demonstração), não uma leitura real das ${lineCount} linhas enviadas.`,
       ],
       disclaimers: [DEMO_DISCLAIMER],
+      sectionStatus: {},
     };
 
     return result;
