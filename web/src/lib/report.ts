@@ -38,9 +38,9 @@ export function buildFinalReport(
     analyzedAt: result.createdAt,
     declaredIntent: describeIntent(version),
     perceivedMessage: result.overview.perceivedCentralMessage,
-    structureOverview: `${result.overview.compositionType} — estrutura: ${result.coherence.narrativeMap.structureType}`,
+    structureOverview: result.overview.compositionType,
     lyricalClassification: result.mood.perceivedFunctions.join(", "),
-    emotion: `${result.overview.mainEmotion} (${result.mood.lyricalEmotions.join(", ")}); energia textual: ${result.mood.textualEnergy}`,
+    emotion: result.overview.mainEmotion,
     bibleReferences: result.bibleReferences,
     biblicalContextNotes: result.biblicalContext.map(
       (c) => `${c.usageClassification}: ${c.relationToLyrics}`
@@ -54,7 +54,9 @@ export function buildFinalReport(
     compositionObservations: result.compositionFindings.map((c) => c.observation),
     productionObservations: [result.mood.disclaimer, result.mood.movementDescription],
     congregationalFit: result.congregational.applicable
-      ? result.congregational.notes ?? "Ver detalhes da análise congregacional."
+      ? [result.congregational.notes, result.congregational.clarity, result.congregational.singability]
+          .filter((v): v is string => Boolean(v && v.trim()))
+          .join(" ") || "Ver detalhes da análise congregacional."
       : "Não avaliado como música congregacional nesta análise.",
     strengths: result.overview.strengths,
     attentionPoints: result.overview.attentionPoints,

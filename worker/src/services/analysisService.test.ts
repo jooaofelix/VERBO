@@ -46,4 +46,12 @@ describe("runAnalysis (demo mode, no AI binding available)", () => {
     const { result } = await runAnalysis(request({ lyrics: "(instrumental)" }), undefined);
     expect(result.id).toBeTruthy();
   });
+
+  it("identifies Salmo 126:5 from the lyric phrase even without an AI binding", async () => {
+    const { result } = await runAnalysis(
+      request({ lyrics: "Aqueles que semeiam com lágrimas colherão com a alegria do Senhor" }),
+      undefined
+    );
+    expect(result.bibleReferences.some((r) => r.referenceLabel === "Salmos 126:5")).toBe(true);
+  });
 });

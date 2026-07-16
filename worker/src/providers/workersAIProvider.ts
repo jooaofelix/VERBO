@@ -1,25 +1,25 @@
 import type { AIProducedAnalysis, AnalyzeRequest, SectionStatusValue, SongSection } from "@verbo/shared";
 import {
+  AREA_SYSTEM_PROMPT,
+  AREA_SYSTEM_PROMPT_RETRY,
   ALL_AREAS,
-  areaDefaults,
-  areaRetrySystemPrompt,
+  areaAISchemaFor,
+  areaEmptyShape,
+  areaJsonSchema,
   areaRetryUserPayload,
-  areaSchemaFor,
-  areaSystemPrompt,
   areaUserPayload,
   areasForMode,
+  applyAreaAliases,
   coerceObject,
-  congregacionalAreaDefaults,
-  composicaoAreaDefaults,
+  extractJson,
+  mergeAreasIntoAnalysis,
   type Area,
-  type AreaOutput,
-  type BiblicalAreaOutput,
-  type ComposicaoAreaOutput,
-  type CongregacionalAreaOutput,
-  type PortuguesAreaOutput,
+  type AreaAIShape,
+  type AreaShapes,
 } from "./areas.js";
 import type { AIAnalysisProvider, LyricsAnalysisInput } from "./provider.js";
 import {
+  QUICK_JSON_SCHEMA,
   QUICK_SYSTEM_PROMPT,
   QUICK_SYSTEM_PROMPT_RETRY,
   QuickReviewSchema,
@@ -39,7 +39,9 @@ const AREA_MAX_TOKENS_COMPLETA = 500;
 const AREA_MAX_TOKENS_INDIVIDUAL = 650;
 const AREA_RETRY_MAX_TOKENS = 350;
 
-const UNAVAILABLE_MESSAGE = "Esta parte da análise demorou mais que o esperado. Tente novamente.";
+const TIMEOUT_MESSAGE = "Esta parte da análise demorou mais que o esperado. Tente novamente.";
+const FORMAT_INVALID_MESSAGE = "A resposta desta seção não pôde ser processada.";
+const GENERIC_UNAVAILABLE_MESSAGE = "Não foi possível concluir esta parte da análise agora. Tente novamente.";
 
 // Workers AI reports a request timeout either as numeric error code 3046 or
 // 3007, or with "Request timeout" somewhere in the message, depending on
@@ -71,88 +73,11 @@ interface ChatMessage {
   content: string;
 }
 
-function stripCodeFence(text: string): string {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return fenced ? fenced[1] : trimmed;
-}
-
-function extractJson(raw: unknown): unknown {
-  if (raw && typeof raw === "object") return raw;
-  if (typeof raw === "string") {
-    const cleaned = stripCodeFence(raw);
-    try {
-      return JSON.parse(cleaned);
-    } catch {
-      const start = cleaned.indexOf("{");
-      const end = cleaned.lastIndexOf("}");
-      if (start >= 0 && end > start) {
-        return JSON.parse(cleaned.slice(start, end + 1));
-      }
-      throw new Error("Resposta do modelo não é um JSON válido.");
-    }
-  }
-  throw new Error("Resposta do modelo em formato inesperado.");
-}
-
-function baseAnalysis(request: AnalyzeRequest): AIProducedAnalysis {
-  const composicao = composicaoAreaDefaults(request);
-  const congregacional = congregacionalAreaDefaults(request);
-  return {
-    overview: composicao.overview,
-    bibleReferences: [],
-    biblicalContext: [],
-    theologicalClaims: [],
-    coherence: composicao.coherence,
-    grammarFindings: [],
-    compositionFindings: [],
-    chorusAnalysis: composicao.chorusAnalysis,
-    rhymeFindings: [],
-    mood: composicao.mood,
-    congregational: congregacional.congregational,
-    composerQuestions: [],
-    findings: [],
-    limitations: [],
-    disclaimers: [],
-    sectionStatus: {},
-  };
-}
-
-function applyAreaResult(base: AIProducedAnalysis, area: Area, output: AreaOutput): void {
-  switch (area) {
-    case "biblica_teologica": {
-      const o = output as BiblicalAreaOutput;
-      base.bibleReferences = o.bibleReferences;
-      base.biblicalContext = o.biblicalContext;
-      base.theologicalClaims = o.theologicalClaims;
-      base.findings = [...base.findings, ...o.findings];
-      return;
-    }
-    case "portugues": {
-      const o = output as PortuguesAreaOutput;
-      base.grammarFindings = o.grammarFindings;
-      base.findings = [...base.findings, ...o.findings];
-      return;
-    }
-    case "composicao": {
-      const o = output as ComposicaoAreaOutput;
-      base.overview = o.overview;
-      base.coherence = o.coherence;
-      base.compositionFindings = o.compositionFindings;
-      base.chorusAnalysis = o.chorusAnalysis;
-      base.rhymeFindings = o.rhymeFindings;
-      base.mood = o.mood;
-      base.findings = [...base.findings, ...o.findings];
-      return;
-    }
-    case "congregacional": {
-      const o = output as CongregacionalAreaOutput;
-      base.congregational = o.congregational;
-      base.findings = [...base.findings, ...o.findings];
-      return;
-    }
-  }
-}
+type AttemptOutcome =
+  | { kind: "ok"; data: AreaAIShape }
+  | { kind: "timeout" }
+  | { kind: "formato_invalido" }
+  | { kind: "erro" };
 
 export class WorkersAIProvider implements AIAnalysisProvider {
   readonly mode = "live" as const;
@@ -177,7 +102,8 @@ export class WorkersAIProvider implements AIAnalysisProvider {
           { role: "user", content: quickUserPayload(request, sections) },
         ],
         QUICK_MAX_TOKENS,
-        QUICK_TEMPERATURE
+        QUICK_TEMPERATURE,
+        QUICK_JSON_SCHEMA
       );
       const parsed = QuickReviewSchema.parse(extractJson(res.parsed ?? res.text));
       console.log("analyze section success", { area: "rapida", attempt: 1 });
@@ -194,7 +120,8 @@ export class WorkersAIProvider implements AIAnalysisProvider {
           { role: "user", content: quickRetryUserPayload(sections) },
         ],
         QUICK_RETRY_MAX_TOKENS,
-        QUICK_TEMPERATURE
+        QUICK_TEMPERATURE,
+        QUICK_JSON_SCHEMA
       );
       const parsed = QuickReviewSchema.parse(extractJson(res.parsed ?? res.text));
       console.log("analyze section success", { area: "rapida", attempt: 2 });
@@ -217,19 +144,20 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     const primaryMaxTokens =
       request.revisionMode === "completa" ? AREA_MAX_TOKENS_COMPLETA : AREA_MAX_TOKENS_INDIVIDUAL;
 
-    const result = baseAnalysis(request);
+    const shapes: AreaShapes = {};
     const sectionStatus: Record<string, SectionStatusValue> = {};
 
     // Run one area at a time (not in parallel) to keep load on Workers AI
     // predictable and make a single failing area easy to isolate.
     for (const area of areas) {
       const { status, data } = await this.runArea(area, request, sections, primaryMaxTokens);
-      applyAreaResult(result, area, data);
-      if (status === "indisponivel") {
-        sectionStatus[area] = { status: "indisponivel", mensagem: UNAVAILABLE_MESSAGE };
+      (shapes as Record<Area, AreaAIShape>)[area] = data;
+      if (status !== "ok") {
+        sectionStatus[area] = { status, mensagem: messageForStatus(status) };
       }
     }
 
+    const result = mergeAreasIntoAnalysis(request, shapes);
     result.sectionStatus = sectionStatus;
 
     if (Object.keys(sectionStatus).length > 0) {
@@ -246,66 +174,76 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     request: AnalyzeRequest,
     sections: SongSection[],
     maxTokens: number
-  ): Promise<{ status: "ok" | "indisponivel"; data: AreaOutput }> {
-    const schema = areaSchemaFor(area);
-    const fallback = areaDefaults(area, request);
-
+  ): Promise<{ status: "ok" | "timeout" | "formato_invalido" | "indisponivel"; data: AreaAIShape }> {
     console.log("analyze section start", { area, attempt: 1 });
-    try {
-      const res = await this.runModel(
-        [
-          { role: "system", content: areaSystemPrompt(area) },
-          { role: "user", content: areaUserPayload(area, request, sections) },
-        ],
-        maxTokens,
-        AREA_TEMPERATURE
-      );
-      const raw = extractJson(res.parsed ?? res.text);
+    const first = await this.attemptArea(
+      area,
+      [
+        { role: "system", content: AREA_SYSTEM_PROMPT },
+        { role: "user", content: areaUserPayload(area, request, sections) },
+      ],
+      maxTokens
+    );
+    if (first.kind === "ok") {
       console.log("analyze section success", { area, attempt: 1 });
-      return { status: "ok", data: coerceObject(schema, raw, fallback as Record<string, unknown>) as AreaOutput };
+      return { status: "ok", data: first.data };
+    }
+    console.log(logLabelFor(first.kind), { area, attempt: 1, kind: first.kind });
+
+    // Exactly one retry, regardless of why the first attempt failed — never
+    // the same full call again, always the smaller prompt/budget below.
+    console.log("analyze section start", { area, attempt: 2 });
+    const retry = await this.attemptArea(
+      area,
+      [
+        { role: "system", content: AREA_SYSTEM_PROMPT_RETRY },
+        { role: "user", content: areaRetryUserPayload(area, sections) },
+      ],
+      AREA_RETRY_MAX_TOKENS
+    );
+    if (retry.kind === "ok") {
+      console.log("analyze section success", { area, attempt: 2 });
+      return { status: "ok", data: retry.data };
+    }
+    console.log(logLabelFor(retry.kind), { area, attempt: 2, kind: retry.kind });
+
+    const status = retry.kind === "erro" ? "indisponivel" : retry.kind;
+    return { status, data: areaEmptyShape(area) };
+  }
+
+  /** Runs one model call for an area and classifies the outcome — never throws. */
+  private async attemptArea(area: Area, messages: ChatMessage[], maxTokens: number): Promise<AttemptOutcome> {
+    let res: { parsed: unknown; text: string };
+    try {
+      res = await this.runModel(messages, maxTokens, AREA_TEMPERATURE, areaJsonSchema(area));
     } catch (err) {
-      if (!isTimeoutError(err)) {
-        console.error("analyze section error", {
-          area,
-          attempt: 1,
-          message: err instanceof Error ? err.message : String(err),
-        });
-        return { status: "indisponivel", data: fallback };
-      }
-      console.log("analyze section timeout", { area, attempt: 1 });
+      return isTimeoutError(err) ? { kind: "timeout" } : { kind: "erro" };
     }
 
-    // A retry is only attempted after a timeout, and only once, with a
-    // smaller prompt and a smaller token budget — never the same full call.
-    console.log("analyze section start", { area, attempt: 2 });
+    let extracted: unknown;
     try {
-      const res = await this.runModel(
-        [
-          { role: "system", content: areaRetrySystemPrompt(area) },
-          { role: "user", content: areaRetryUserPayload(area, sections) },
-        ],
-        AREA_RETRY_MAX_TOKENS,
-        AREA_TEMPERATURE
-      );
-      const raw = extractJson(res.parsed ?? res.text);
-      console.log("analyze section success", { area, attempt: 2 });
-      return { status: "ok", data: coerceObject(schema, raw, fallback as Record<string, unknown>) as AreaOutput };
+      extracted = extractJson(res.parsed ?? res.text);
     } catch {
-      console.log("analyze section timeout", { area, attempt: 2 });
-      return { status: "indisponivel", data: fallback };
+      return { kind: "formato_invalido" };
     }
+
+    const schema = areaAISchemaFor(area);
+    const aliased = applyAreaAliases(extracted, area);
+    const coerced = coerceObject(schema, aliased, areaEmptyShape(area) as Record<string, unknown>);
+    return { kind: "ok", data: coerced as AreaAIShape };
   }
 
   private async runModel(
     messages: ChatMessage[],
     maxTokens: number,
-    temperature: number
+    temperature: number,
+    jsonSchema: unknown
   ): Promise<{ parsed: unknown; text: string }> {
     const result = (await this.ai.run(MODEL as never, {
       messages,
-      // No JSON Schema is sent — short prose instructions in the prompt do
-      // the formatting job, and the result is validated locally afterwards.
-      response_format: { type: "json_object" },
+      // A small, area-specific JSON Schema — never the whole AnalysisResult
+      // schema — drives Workers AI's native structured-output mode.
+      response_format: { type: "json_schema", json_schema: jsonSchema },
       max_tokens: maxTokens,
       temperature,
     } as never)) as { response?: unknown };
@@ -315,6 +253,28 @@ export class WorkersAIProvider implements AIAnalysisProvider {
       parsed: response && typeof response === "object" ? response : undefined,
       text: typeof response === "string" ? response : JSON.stringify(response ?? ""),
     };
+  }
+}
+
+function messageForStatus(status: "timeout" | "formato_invalido" | "indisponivel"): string {
+  switch (status) {
+    case "timeout":
+      return TIMEOUT_MESSAGE;
+    case "formato_invalido":
+      return FORMAT_INVALID_MESSAGE;
+    case "indisponivel":
+      return GENERIC_UNAVAILABLE_MESSAGE;
+  }
+}
+
+function logLabelFor(kind: "timeout" | "formato_invalido" | "erro"): string {
+  switch (kind) {
+    case "timeout":
+      return "analyze section timeout";
+    case "formato_invalido":
+      return "analyze section format-invalid";
+    case "erro":
+      return "analyze section error";
   }
 }
 

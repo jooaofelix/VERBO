@@ -1,5 +1,6 @@
 import type { AIProducedAnalysis, AnalyzeRequest, SongSection } from "@verbo/shared";
 import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 /**
  * "Revisão rápida" never asks for the full AIProducedAnalysis shape — it's
@@ -13,6 +14,12 @@ export const QuickReviewSchema = z.object({
   sugestaoFinal: z.string(),
 });
 export type QuickReview = z.infer<typeof QuickReviewSchema>;
+
+/** Small JSON Schema for Workers AI's native structured-output mode. */
+export const QUICK_JSON_SCHEMA = zodToJsonSchema(QuickReviewSchema, {
+  target: "openApi3",
+  $refStrategy: "none",
+});
 
 export const QUICK_SYSTEM_PROMPT =
   "Você é revisor de letras musicais cristãs. Responda SOMENTE com um objeto JSON válido, sem " +

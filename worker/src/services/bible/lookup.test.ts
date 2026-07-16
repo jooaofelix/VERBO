@@ -1,6 +1,6 @@
 import type { BibleReference } from "@verbo/shared";
 import { describe, expect, it } from "vitest";
-import { enrichBibleReferences, lookupVerse } from "./lookup.js";
+import { detectCuratedAllusions, enrichBibleReferences, lookupVerse } from "./lookup.js";
 
 function ref(overrides: Partial<BibleReference>): BibleReference {
   return {
@@ -43,6 +43,43 @@ describe("lookupVerse", () => {
     expect(result.found).toBe(false);
     expect(result.text).toBeUndefined();
     expect(result.note).toBeTruthy();
+  });
+});
+
+describe("detectCuratedAllusions", () => {
+  it("identifies Salmo 126:5 from the exact example phrase, independent of the AI", () => {
+    const lyrics = "Aqueles que semeiam com lágrimas colherão com a alegria do Senhor";
+    const [found] = detectCuratedAllusions(lyrics);
+    expect(found).toBeDefined();
+    expect(found.referenceLabel).toBe("Salmos 126:5");
+    expect(found.relationType).toBe("alusao");
+    expect(found.proximity).toBe("alta");
+    expect(found.confidence).toBe("high");
+    expect(found.excerptFromLyrics.toLowerCase()).toContain("semeiam");
+  });
+
+  it("also matches the alternate 'os que semeiam' phrasing", () => {
+    const lyrics = "Verso 1\nOs que semeiam com lágrimas colherão com alegria\n";
+    const [found] = detectCuratedAllusions(lyrics);
+    expect(found?.referenceLabel).toBe("Salmos 126:5");
+  });
+
+  it("is accent- and case-insensitive", () => {
+    const lyrics = "AQUELES QUE SEMEIAM COM LAGRIMAS COLHERAO COM ALEGRIA";
+    const [found] = detectCuratedAllusions(lyrics);
+    expect(found?.referenceLabel).toBe("Salmos 126:5");
+  });
+
+  it("returns nothing when no curated phrase is present", () => {
+    expect(detectCuratedAllusions("Uma letra qualquer sem nenhuma alusão bíblica conhecida.")).toEqual([]);
+  });
+
+  it("does not return duplicate entries for the same verse", () => {
+    const lyrics =
+      "Os que semeiam com lágrimas colherão com alegria\n\n" +
+      "Aqueles que semeiam com lágrimas colherão com a alegria";
+    const found = detectCuratedAllusions(lyrics);
+    expect(found).toHaveLength(1);
   });
 });
 

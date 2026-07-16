@@ -25,7 +25,7 @@ export const HighlightCategorySchema = z.enum([
 ]);
 
 export const SectionStatusValueSchema = z.object({
-  status: z.enum(["ok", "indisponivel"]),
+  status: z.enum(["ok", "timeout", "formato_invalido", "indisponivel"]),
   mensagem: z.string().optional(),
 });
 

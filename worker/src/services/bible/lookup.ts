@@ -11,6 +11,19 @@ function normalize(text: string): string {
     .trim();
 }
 
+const ALLUSION_INDEX: Array<{ verse: CuratedVerse; normalizedPhrases: string[] }> = CURATED_VERSES.filter(
+  (v) => v.allusionPhrases && v.allusionPhrases.length > 0
+).map((verse) => ({
+  verse,
+  normalizedPhrases: (verse.allusionPhrases ?? []).map(normalize),
+}));
+
+function findOriginalExcerpt(lyrics: string, phrase: string): string | null {
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = lyrics.match(new RegExp(escaped, "i"));
+  return match ? match[0] : null;
+}
+
 const INDEX = new Map<string, CuratedVerse>();
 for (const verse of CURATED_VERSES) {
   INDEX.set(normalize(verse.referenceLabel), verse);
@@ -50,6 +63,50 @@ export function lookupVerse(query: string): BibleLookupResponse {
 
 export function listAvailableReferences(): string[] {
   return CURATED_VERSES.map((v) => v.referenceLabel);
+}
+
+/**
+ * Scans the raw lyrics for a small set of curated, very-well-known
+ * allusion phrasings (e.g. "os que semeiam com lágrimas colherão com
+ * alegria" → Salmos 126:5) and returns a BibleReference for each match —
+ * entirely independent of what the AI itself identified, so a well-known
+ * allusion is never missed just because a small model's biblical-area call
+ * failed, timed out, or simply didn't catch it.
+ */
+export function detectCuratedAllusions(lyrics: string): BibleReference[] {
+  const normalizedLyrics = normalize(lyrics);
+  const found: BibleReference[] = [];
+  const seenReferenceLabels = new Set<string>();
+
+  for (const { verse, normalizedPhrases } of ALLUSION_INDEX) {
+    if (seenReferenceLabels.has(verse.referenceLabel)) continue;
+    const matchedPhrase = verse.allusionPhrases?.find((phrase, i) =>
+      normalizedLyrics.includes(normalizedPhrases[i])
+    );
+    if (!matchedPhrase) continue;
+
+    seenReferenceLabels.add(verse.referenceLabel);
+    found.push({
+      id: `curated-allusion-${normalize(verse.referenceLabel).replace(/\s+/g, "-")}`,
+      excerptFromLyrics: findOriginalExcerpt(lyrics, matchedPhrase) ?? matchedPhrase,
+      referenceLabel: verse.referenceLabel,
+      book: verse.book,
+      chapterStart: verse.chapterStart,
+      verseStart: verse.verseStart,
+      chapterEnd: verse.chapterEnd,
+      verseEnd: verse.verseEnd,
+      relationType: "alusao",
+      proximity: "alta",
+      explanation:
+        "Frase da letra corresponde a uma alusão bem conhecida a este versículo, reconhecida " +
+        "automaticamente por um conjunto curado, independente do que o modelo de IA identificou.",
+      confidence: "high",
+      translationUsed: "dominio_publico_almeida",
+      verseTextAvailable: false,
+    });
+  }
+
+  return found;
 }
 
 /**

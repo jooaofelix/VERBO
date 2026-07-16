@@ -8,6 +8,12 @@ export interface CuratedVerse {
   text: string;
   /** Alternate ways this reference might be typed/searched. */
   aliases: string[];
+  /**
+   * Common lyric-phrasing variants that allude to this verse closely enough
+   * to be detected directly in a lyric's text, independent of whatever the
+   * AI itself identifies — see detectCuratedAllusions() in lookup.ts.
+   */
+  allusionPhrases?: string[];
 }
 
 /**
@@ -152,6 +158,22 @@ export const CURATED_VERSES: CuratedVerse[] = [
       "Elevo os meus olhos aos montes, de onde vem o meu socorro. O meu socorro vem do Senhor, que " +
       "fez os céus e a terra.",
     aliases: ["sl 121:1-2", "salmo 121:1-2"],
+  },
+  {
+    book: "Salmos",
+    chapterStart: 126,
+    verseStart: 5,
+    referenceLabel: "Salmos 126:5",
+    text: "Os que semeiam em lágrimas segarão com alegria.",
+    aliases: ["sl 126:5", "salmo 126:5", "salmos 126:5"],
+    allusionPhrases: [
+      "os que semeiam com lágrimas colherão com alegria",
+      "os que semeiam com lágrimas colherão com a alegria",
+      "aqueles que semeiam com lágrimas colherão com alegria",
+      "aqueles que semeiam com lágrimas colherão com a alegria",
+      "quem semeia com lágrimas colherá com alegria",
+      "semeando com lágrimas colherão com alegria",
+    ],
   },
   {
     book: "Salmos",

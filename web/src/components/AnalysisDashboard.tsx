@@ -46,7 +46,7 @@ export function AnalysisDashboard({ uid, song, version, result }: Props) {
   const [tab, setTab] = useState<Tab>("Visão geral");
   const decisions = version.findingDecisions ?? {};
   const unavailableSections = Object.entries(result.sectionStatus ?? {}).filter(
-    ([, s]) => s.status === "indisponivel"
+    ([, s]) => s.status !== "ok"
   );
 
   function handleDecide(findingId: string, decision: "accepted" | "ignored" | undefined) {
@@ -66,13 +66,14 @@ export function AnalysisDashboard({ uid, song, version, result }: Props) {
       {unavailableSections.length > 0 && (
         <div className="mb-4 flex flex-col gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
           <p className="font-medium">Análise parcial</p>
-          <p>
-            {unavailableSections
-              .map(([area]) => AREA_LABELS[area] ?? area)
-              .join(", ")}{" "}
-            demorou mais que o esperado e não pôde ser concluída agora. As demais partes desta
-            análise estão completas — rode a análise novamente para tentar completar o restante.
-          </p>
+          <ul className="list-disc pl-5">
+            {unavailableSections.map(([area, s]) => (
+              <li key={area}>
+                <strong>{AREA_LABELS[area] ?? area}:</strong> {s.mensagem}
+              </li>
+            ))}
+          </ul>
+          <p>As demais partes desta análise estão completas — rode a análise novamente para tentar completar o restante.</p>
         </div>
       )}
 

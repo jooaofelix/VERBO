@@ -214,6 +214,6 @@ describe("worker fetch handler", () => {
       result: { sectionStatus: Record<string, { status: string }> };
     };
     expect(body.mode).toBe("live");
-    expect(Object.values(body.result.sectionStatus).every((s) => s.status === "indisponivel")).toBe(true);
+    expect(Object.values(body.result.sectionStatus).every((s) => s.status === "timeout")).toBe(true);
   });
 });
