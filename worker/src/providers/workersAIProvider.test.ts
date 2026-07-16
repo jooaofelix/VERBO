@@ -1,7 +1,7 @@
 import type { AnalyzeRequest, SongSection } from "@verbo/shared";
 import { describe, expect, it, vi } from "vitest";
 import { DemoAIProvider } from "./demoProvider.js";
-import { WorkersAIProvider } from "./workersAIProvider.js";
+import { AITimeoutError, WorkersAIProvider } from "./workersAIProvider.js";
 
 function baseRequest(): AnalyzeRequest {
   return {
@@ -99,5 +99,143 @@ describe("WorkersAIProvider", () => {
       })
     ).rejects.toThrow();
     expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  describe("timeout handling", () => {
+    it("retries once with a simplified prompt after a 3046 timeout, and succeeds", async () => {
+      const fixture = await validFixture();
+      const run = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("3046: Request timeout"))
+        .mockResolvedValueOnce({ response: fixture });
+      const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+      const result = await provider.analyzeLyrics({
+        request: baseRequest(),
+        sections: sections(),
+        deterministicGrammar: [],
+        prosody: [],
+      });
+
+      expect(result.overview.perceivedCentralMessage).toBe(fixture.overview.perceivedCentralMessage);
+      expect(run).toHaveBeenCalledTimes(2);
+
+      // The retry must not chain off the first (failed) call — no assistant
+      // turn from a repair loop, and the lyrics must still be present.
+      const retryOptions = run.mock.calls[1][1] as { messages: Array<{ role: string; content: string }> };
+      expect(retryOptions.messages.some((m) => m.role === "assistant")).toBe(false);
+      expect(retryOptions.messages.some((m) => m.content.includes("Tu és fiel"))).toBe(true);
+    });
+
+    it("retries once with a simplified prompt after a 3007 timeout, and succeeds", async () => {
+      const fixture = await validFixture();
+      const run = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("Error 3007: Request timeout while running model"))
+        .mockResolvedValueOnce({ response: fixture });
+      const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+      const result = await provider.analyzeLyrics({
+        request: baseRequest(),
+        sections: sections(),
+        deterministicGrammar: [],
+        prosody: [],
+      });
+
+      expect(result.overview.perceivedCentralMessage).toBe(fixture.overview.perceivedCentralMessage);
+      expect(run).toHaveBeenCalledTimes(2);
+    });
+
+    it("recognizes a bare 'Request timeout' message without a numeric code", async () => {
+      const fixture = await validFixture();
+      const run = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("Request timeout"))
+        .mockResolvedValueOnce({ response: fixture });
+      const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+      await provider.analyzeLyrics({
+        request: baseRequest(),
+        sections: sections(),
+        deterministicGrammar: [],
+        prosody: [],
+      });
+
+      expect(run).toHaveBeenCalledTimes(2);
+    });
+
+    it("uses a smaller max_tokens budget on the timeout retry", async () => {
+      const fixture = await validFixture();
+      const run = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("3046: Request timeout"))
+        .mockResolvedValueOnce({ response: fixture });
+      const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+      await provider.analyzeLyrics({
+        request: baseRequest(),
+        sections: sections(),
+        deterministicGrammar: [],
+        prosody: [],
+      });
+
+      const firstOptions = run.mock.calls[0][1] as { max_tokens: number };
+      const retryOptions = run.mock.calls[1][1] as { max_tokens: number };
+      expect(retryOptions.max_tokens).toBeLessThan(firstOptions.max_tokens);
+    });
+
+    it("does not run the generic schema-repair loop when the first attempt times out", async () => {
+      // Even though the retry response fails schema validation, the call
+      // count must stop at 2 (first attempt + single timeout retry) — never
+      // a 3rd repair-style call.
+      const run = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("3046: Request timeout"))
+        .mockResolvedValueOnce({ response: { not: "valid" } });
+      const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+      await expect(
+        provider.analyzeLyrics({
+          request: baseRequest(),
+          sections: sections(),
+          deterministicGrammar: [],
+          prosody: [],
+        })
+      ).rejects.toThrow(AITimeoutError);
+      expect(run).toHaveBeenCalledTimes(2);
+    });
+
+    it("throws AITimeoutError when both the first attempt and the retry time out", async () => {
+      const run = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("3046: Request timeout"))
+        .mockRejectedValueOnce(new Error("3007: Request timeout"));
+      const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+      await expect(
+        provider.analyzeLyrics({
+          request: baseRequest(),
+          sections: sections(),
+          deterministicGrammar: [],
+          prosody: [],
+        })
+      ).rejects.toThrow(AITimeoutError);
+      expect(run).toHaveBeenCalledTimes(2);
+    });
+
+    it("lets a non-timeout error from the first attempt propagate without retrying", async () => {
+      const run = vi.fn().mockRejectedValue(new Error("500: Internal error"));
+      const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+      await expect(
+        provider.analyzeLyrics({
+          request: baseRequest(),
+          sections: sections(),
+          deterministicGrammar: [],
+          prosody: [],
+        })
+      ).rejects.toThrow("500: Internal error");
+      expect(run).toHaveBeenCalledTimes(1);
+    });
   });
 });

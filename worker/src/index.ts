@@ -1,5 +1,6 @@
 import { AnalyzeRequestSchema } from "@verbo/shared";
 import { z } from "zod";
+import { AITimeoutError } from "./providers/workersAIProvider.js";
 import { extractBearerToken, verifyFirebaseIdToken, AuthError } from "./security/auth.js";
 import { isWithinRateLimit } from "./security/rateLimit.js";
 import { assertLyricsSizeWithinLimit, ValidationError } from "./security/validation.js";
@@ -109,6 +110,9 @@ export default {
           400,
           origin
         );
+      }
+      if (err instanceof AITimeoutError) {
+        return json({ error: err.message }, 504, origin);
       }
       console.error("Erro inesperado:", err instanceof Error ? err.message : err);
       return json({ error: "Erro inesperado ao processar a requisição." }, 500, origin);

@@ -176,4 +176,22 @@ describe("worker fetch handler", () => {
     const res = await worker.fetch(new Request("https://worker.example/nope"), env);
     expect(res.status).toBe(404);
   });
+
+  it("returns 504 with a Portuguese message when the AI binding times out on both attempts", async () => {
+    const aiEnv: Env = {
+      ...env,
+      AI: { run: vi.fn().mockRejectedValue(new Error("3046: Request timeout")) } as unknown as Ai,
+    };
+    const res = await worker.fetch(
+      new Request("https://worker.example/analyze", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ lyrics: "Tu és fiel", context: {} }),
+      }),
+      aiEnv
+    );
+    expect(res.status).toBe(504);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("demorou mais");
+  });
 });
