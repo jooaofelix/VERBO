@@ -48,8 +48,21 @@ function biblicalFixture(): BiblicalAIShape {
 
 function portuguesFixture(): PortuguesAIShape {
   return {
-    correcoes: [{ trecho: "nós vai", problema: "Discordância verbal.", sugestao: "nós vamos" }],
+    resumo: "A letra tem boas imagens, mas precisa de ajustes de concordância e consistência de pessoa.",
+    correcoes: [
+      {
+        trechoOriginal: "nós vai",
+        tipo: "concordancia",
+        gravidade: "alta",
+        explicacao: "O verbo \"vai\" está na terceira pessoa do singular, mas o sujeito \"nós\" exige a primeira pessoa do plural.",
+        opcao1: "nós vamos",
+        opcao2: "",
+        observacaoDeSentido: "",
+      },
+    ],
+    problemasDeConsistencia: [],
     pontosFortes: ["Vocabulário simples e direto."],
+    prioridades: ["Corrigir \"nós vai\" para \"nós vamos\"."],
   };
 }
 
@@ -194,10 +207,19 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
     });
 
     expect(run).toHaveBeenCalledTimes(4);
-    for (const options of run.mock.calls.map((c) => c[1] as RunOptions)) {
-      expect(options.max_tokens).toBe(500);
-      expect(options.temperature).toBe(0.15);
+    for (const call of run.mock.calls) {
+      const [model, options] = call as [string, RunOptions];
       expect(options.response_format.type).toBe("json_schema");
+      if (model === "@cf/meta/llama-3.1-8b-instruct-fast") {
+        // "português" is the one area allowed to use the bigger model.
+        expect(options.max_tokens).toBeGreaterThanOrEqual(650);
+        expect(options.max_tokens).toBeLessThanOrEqual(850);
+        expect(options.temperature).toBe(0.1);
+      } else {
+        expect(model).toBe("@cf/meta/llama-3.2-3b-instruct");
+        expect(options.max_tokens).toBe(500);
+        expect(options.temperature).toBe(0.15);
+      }
     }
     expect(result.sectionStatus).toEqual({});
     expect(result.bibleReferences).toHaveLength(1);
@@ -443,7 +465,7 @@ describe("WorkersAIProvider — individual review modes (one area)", () => {
     const provider = new WorkersAIProvider({ run } as unknown as Ai);
 
     const result = await provider.analyzeLyrics({
-      request: baseRequest("portugues"),
+      request: baseRequest("biblica_teologica"),
       sections: sections(),
       deterministicGrammar: [],
       prosody: [],
@@ -453,8 +475,256 @@ describe("WorkersAIProvider — individual review modes (one area)", () => {
     const options = run.mock.calls[0][1] as RunOptions;
     expect(options.max_tokens).toBeGreaterThanOrEqual(500);
     expect(options.max_tokens).toBeLessThanOrEqual(700);
-    expect(result.grammarFindings).toHaveLength(1);
+    expect(result.bibleReferences).toHaveLength(1);
     expect(result.sectionStatus).toEqual({});
+  });
+});
+
+describe("WorkersAIProvider — português: bigger model, isolated call, detailed corrections", () => {
+  it("uses llama-3.1-8b-instruct-fast with 650-850 tokens and temperature 0.1 for a single português call", async () => {
+    const run = vi.fn().mockResolvedValue({ response: portuguesFixture() });
+    const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+    const result = await provider.analyzeLyrics({
+      request: baseRequest("portugues"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    expect(run).toHaveBeenCalledTimes(1);
+    const [model, options] = run.mock.calls[0] as [string, RunOptions];
+    expect(model).toBe("@cf/meta/llama-3.1-8b-instruct-fast");
+    expect(options.max_tokens).toBeGreaterThanOrEqual(650);
+    expect(options.max_tokens).toBeLessThanOrEqual(850);
+    expect(options.temperature).toBe(0.1);
+    expect(result.grammarFindings).toHaveLength(1);
+  });
+
+  it("retries a timed-out português call with the 3B model and 450 tokens, not the 8B model again", async () => {
+    const run = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("3046: Request timeout"))
+      .mockResolvedValueOnce({ response: portuguesFixture() });
+    const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+    await provider.analyzeLyrics({
+      request: baseRequest("portugues"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    expect(run).toHaveBeenCalledTimes(2);
+    const [firstModel] = run.mock.calls[0] as [string, RunOptions];
+    const [retryModel, retryOptions] = run.mock.calls[1] as [string, RunOptions];
+    expect(firstModel).toBe("@cf/meta/llama-3.1-8b-instruct-fast");
+    expect(retryModel).toBe("@cf/meta/llama-3.2-3b-instruct");
+    expect(retryOptions.max_tokens).toBe(450);
+  });
+
+  it("produces specific, actionable corrections for the example lyric — never vague generic text", async () => {
+    const run = vi.fn().mockResolvedValue({
+      response: {
+        resumo: "Revisão detalhada da letra de testemunho.",
+        correcoes: [
+          {
+            trechoOriginal: "Sua mao forte me salvou",
+            tipo: "ortografia",
+            gravidade: "media",
+            explicacao: "\"mao\" precisa do acento circunflexo: a grafia correta é \"mão\".",
+            opcao1: "Sua mão forte me salvou.",
+            opcao2: "",
+            observacaoDeSentido: "",
+          },
+          {
+            trechoOriginal: "sua forte mão me salvo",
+            tipo: "concordancia",
+            gravidade: "alta",
+            explicacao:
+              "\"salvo\" está no presente do indicativo na primeira pessoa, ou funciona como adjetivo; para indicar uma ação " +
+              "passada realizada por Deus, o verbo correto é \"salvou\".",
+            opcao1: "Sua forte mão me salvou.",
+            opcao2: "",
+            observacaoDeSentido: "",
+          },
+          {
+            trechoOriginal: "Esperança e graça em ti encontrou",
+            tipo: "concordancia",
+            gravidade: "media",
+            explicacao:
+              "Não fica claro quem encontrou esperança e graça — o verbo \"encontrou\" está na terceira pessoa, mas o " +
+              "sujeito não aparece claramente na frase.",
+            opcao1: "Em ti, esperança e graça encontrei.",
+            opcao2: "Meu coração encontrou em ti esperança e graça.",
+            observacaoDeSentido: "As duas opções mantêm o sentido original, apenas deixando o sujeito explícito.",
+          },
+          {
+            trechoOriginal: "Grande amor / Nos mostrou",
+            tipo: "coerencia",
+            gravidade: "media",
+            explicacao: "Não fica claro quem mostrou o grande amor nem o que foi mostrado.",
+            opcao1: "Seu grande amor nos alcançou.",
+            opcao2: "Seu grande amor nos mostrou o caminho.",
+            observacaoDeSentido: "A opção 2 acrescenta a ideia de direção/caminho, ausente no trecho original.",
+          },
+        ],
+        problemasDeConsistencia: [
+          "A letra alterna entre primeira pessoa do singular (\"me salvou\") e primeira pessoa do plural " +
+            "(\"nos mostrou\", \"vamos desfrutar\") sem uma transição clara — vale perguntar ao compositor se " +
+            "deseja um testemunho pessoal ou uma canção coletiva.",
+        ],
+        pontosFortes: ["Progressão do medo para a esperança ao longo da letra."],
+        prioridades: [
+          "Definir se a letra será narrada em \"eu\" ou \"nós\".",
+          "Corrigir \"me salvo\" para \"me salvou\".",
+          "Reescrever \"Esperança e graça em ti encontrou\".",
+          "Completar a construção \"Grande amor / Nos mostrou\".",
+          "Uniformizar o refrão e o tamanho das linhas.",
+        ],
+      },
+    });
+    const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+    const result = await provider.analyzeLyrics({
+      request: baseRequest("portugues"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    // "mao" → "mão"
+    const orthography = result.grammarFindings.find((f) => f.originalExcerpt === "Sua mao forte me salvou");
+    expect(orthography?.type).toBe("ortografia");
+    expect(orthography?.possibleCorrection).toBe("Sua mão forte me salvou.");
+    expect(orthography?.explanation).toContain("acento circunflexo");
+
+    // "me salvo" → "me salvou"
+    const conjugation = result.grammarFindings.find((f) => f.originalExcerpt === "sua forte mão me salvo");
+    expect(conjugation?.possibleCorrection).toBe("Sua forte mão me salvou.");
+    expect(conjugation?.explanation).toContain("salvou");
+
+    // "Esperança e graça em ti encontrou" — unclear subject/agreement, two rewrite options
+    const agreement = result.grammarFindings.find(
+      (f) => f.originalExcerpt === "Esperança e graça em ti encontrou"
+    );
+    expect(agreement?.possibleCorrection).toBe("Em ti, esperança e graça encontrei.");
+    expect(agreement?.alternativeCorrection).toBe("Meu coração encontrou em ti esperança e graça.");
+    expect(agreement?.meaningChangeNote).toBeTruthy();
+
+    // Every correction must cite a real excerpt and a substantive (non-vague) explanation.
+    for (const finding of result.grammarFindings) {
+      expect(finding.originalExcerpt.length).toBeGreaterThan(0);
+      expect(finding.explanation.length).toBeGreaterThan(15);
+      expect(finding.explanation.toLowerCase()).not.toMatch(/pode melhorar|precisa ser revist|pode ficar mais clar/);
+    }
+
+    // "eu" vs "nós" inconsistency surfaced explicitly.
+    expect(
+      result.narrativeConsistencyIssues.some((issue) => issue.includes("primeira pessoa"))
+    ).toBe(true);
+
+    // Priorities: at most 5, in order, concrete and actionable.
+    expect(result.topPriorities.length).toBeLessThanOrEqual(5);
+    expect(result.topPriorities[0]).toMatch(/eu.*nós|nós.*eu/i);
+
+    // Strengths cite something concrete from the lyric, not a generic compliment.
+    expect(result.overview.strengths).toContain("Progressão do medo para a esperança ao longo da letra.");
+  });
+
+  it("drops corrections with vague, non-actionable explanations instead of surfacing them", async () => {
+    const run = vi.fn().mockResolvedValue({
+      response: {
+        resumo: "",
+        correcoes: [
+          {
+            trechoOriginal: "algum trecho",
+            tipo: "fluidez",
+            gravidade: "baixa",
+            explicacao: "Pode melhorar a fluidez.",
+            opcao1: "",
+            opcao2: "",
+            observacaoDeSentido: "",
+          },
+          {
+            trechoOriginal: "outro trecho",
+            tipo: "concordancia",
+            gravidade: "media",
+            explicacao: "A concordância precisa ser revista.",
+            opcao1: "",
+            opcao2: "",
+            observacaoDeSentido: "",
+          },
+          {
+            trechoOriginal: "Sua mao forte me salvou",
+            tipo: "ortografia",
+            gravidade: "media",
+            explicacao: "\"mao\" precisa do acento circunflexo: a grafia correta é \"mão\".",
+            opcao1: "Sua mão forte me salvou.",
+            opcao2: "",
+            observacaoDeSentido: "",
+          },
+        ],
+        problemasDeConsistencia: [],
+        pontosFortes: [],
+        prioridades: [],
+      },
+    });
+    const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+    const result = await provider.analyzeLyrics({
+      request: baseRequest("portugues"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    expect(result.grammarFindings).toHaveLength(1);
+    expect(result.grammarFindings[0].originalExcerpt).toBe("Sua mao forte me salvou");
+  });
+
+  it("never classifies the lyric as 'autoajuda' — corrects the label if a model ever produces it", async () => {
+    const run = vi.fn().mockImplementation(async (_model: string, options: RunOptions) => {
+      const area = areaFromCall(options);
+      if (area === "composicao") {
+        return {
+          response: {
+            ...composicaoFixture(),
+            temaCentral: "Uma canção de autoajuda sobre superação pessoal",
+          },
+        };
+      }
+      return { response: fixtureFor(area) };
+    });
+    const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+    const result = await provider.analyzeLyrics({
+      request: baseRequest("completa"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    expect(result.overview.perceivedCentralMessage.toLowerCase()).not.toContain("autoajuda");
+  });
+
+  it("caps topPriorities at 5 even if the model returns more", async () => {
+    const run = vi.fn().mockResolvedValue({
+      response: {
+        ...portuguesFixture(),
+        prioridades: ["um", "dois", "três", "quatro", "cinco", "seis", "sete"],
+      },
+    });
+    const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+    const result = await provider.analyzeLyrics({
+      request: baseRequest("portugues"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    expect(result.topPriorities).toHaveLength(5);
   });
 });
 

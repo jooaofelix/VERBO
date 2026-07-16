@@ -16,7 +16,10 @@ const CONSISTENCY_LABEL: Record<string, string> = {
 };
 
 export function CompareVersions() {
-  const { songId } = useParams();
+  // Registered under two route patterns — the canonical /projetos/:projectId/comparar
+  // and the legacy /musicas/:songId/comparar alias — so accept whichever param is present.
+  const { songId: songIdParam, projectId } = useParams();
+  const songId = songIdParam ?? projectId;
   const { user } = useAuth();
   const { song } = useSong(songId);
   const { versions } = useSongVersions(songId);
@@ -61,7 +64,7 @@ export function CompareVersions() {
     return (
       <div className="mx-auto max-w-xl px-4 py-10 text-center">
         <p>Composição não encontrada.</p>
-        <Link to="/" className="mt-3 inline-block text-verse-600 underline dark:text-verse-400">
+        <Link to="/projetos" className="mt-3 inline-block text-verse-600 underline dark:text-verse-400">
           Voltar
         </Link>
       </div>

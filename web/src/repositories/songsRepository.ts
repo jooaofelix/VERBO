@@ -12,6 +12,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "../services/firebase/firestore.js";
+import { normalizeLegacyProject } from "../lib/legacyNormalize.js";
 import type { SongDoc, WithId } from "../types/firestore.js";
 
 function songsCollection(uid: string) {
@@ -60,25 +61,35 @@ export async function deleteSong(uid: string, songId: string): Promise<void> {
 
 export async function getSong(uid: string, songId: string): Promise<WithId<SongDoc> | null> {
   const snap = await getDoc(songDoc(uid, songId));
-  return snap.exists() ? ({ id: snap.id, ...(snap.data() as SongDoc) }) : null;
+  return snap.exists() ? normalizeLegacyProject(snap.id, snap.data()) : null;
 }
 
 export function subscribeToSongs(
   uid: string,
-  callback: (songs: WithId<SongDoc>[]) => void
+  callback: (songs: WithId<SongDoc>[]) => void,
+  onError?: (error: Error) => void
 ): Unsubscribe {
   const q = query(songsCollection(uid), orderBy("updatedAt", "desc"));
-  return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as SongDoc) })));
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      callback(snapshot.docs.map((d) => normalizeLegacyProject(d.id, d.data())));
+    },
+    (error) => onError?.(error)
+  );
 }
 
 export function subscribeToSong(
   uid: string,
   songId: string,
-  callback: (song: WithId<SongDoc> | null) => void
+  callback: (song: WithId<SongDoc> | null) => void,
+  onError?: (error: Error) => void
 ): Unsubscribe {
-  return onSnapshot(songDoc(uid, songId), (snap) => {
-    callback(snap.exists() ? { id: snap.id, ...(snap.data() as SongDoc) } : null);
-  });
+  return onSnapshot(
+    songDoc(uid, songId),
+    (snap) => {
+      callback(snap.exists() ? normalizeLegacyProject(snap.id, snap.data()) : null);
+    },
+    (error) => onError?.(error)
+  );
 }

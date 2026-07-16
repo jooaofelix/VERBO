@@ -1,6 +1,7 @@
 import {
   BibleRelationTypeSchema,
   GrammarFindingSchema,
+  GrammarFindingTypeSchema,
   LyricalEmotionSchema,
   NarrativeStructureTypeSchema,
   ProximitySchema,
@@ -64,17 +65,38 @@ export const BiblicalAIShapeSchema = z.object({
 });
 export type BiblicalAIShape = z.infer<typeof BiblicalAIShapeSchema>;
 
+export const PortuguesCorrecaoTipoSchema = z.enum([
+  "ortografia",
+  "concordancia",
+  "regencia",
+  "pontuacao",
+  "clareza",
+  "coerencia",
+  "pessoa_verbal",
+  "fluidez",
+  "prosodia",
+]);
+
+export const PortuguesGravidadeSchema = z.enum(["baixa", "media", "alta"]);
+
 export const PortuguesAIShapeSchema = z.object({
+  resumo: z.string().default(""),
   correcoes: z
     .array(
       z.object({
-        trecho: z.string(),
-        problema: z.string().default(""),
-        sugestao: z.string().default(""),
+        trechoOriginal: z.string(),
+        tipo: PortuguesCorrecaoTipoSchema.default("clareza"),
+        gravidade: PortuguesGravidadeSchema.default("media"),
+        explicacao: z.string().default(""),
+        opcao1: z.string().default(""),
+        opcao2: z.string().default(""),
+        observacaoDeSentido: z.string().default(""),
       })
     )
     .default([]),
+  problemasDeConsistencia: z.array(z.string()).default([]),
   pontosFortes: z.array(z.string()).default([]),
+  prioridades: z.array(z.string()).default([]),
 });
 export type PortuguesAIShape = z.infer<typeof PortuguesAIShapeSchema>;
 
@@ -230,6 +252,12 @@ const AREA_KEY_ALIASES: Record<Area, Record<string, string>> = {
     grammarFindings: "correcoes",
     pontos_fortes: "pontosFortes",
     strengths: "pontosFortes",
+    resumo_geral: "resumo",
+    summary: "resumo",
+    problemas_de_consistencia: "problemasDeConsistencia",
+    consistencia: "problemasDeConsistencia",
+    prioridades_de_correcao: "prioridades",
+    priorities: "prioridades",
   },
   composicao: {
     estrutura_lirica: "estrutura",
@@ -289,13 +317,27 @@ const AREA_FOCUS: Record<Area, string> = {
   biblica_teologica:
     "Identifique referências bíblicas prováveis (ex.: \"Salmos 23:1\"), sua relação com a letra e o tipo " +
     "(direta, alusão ou temática), observações teológicas e pontos fortes. Nunca escreva o texto do " +
-    "versículo, apenas a referência.",
+    "versículo, apenas a referência. Nos pontos fortes, cite elementos concretos da letra (uma frase-eixo " +
+    "repetida, uma alusão bíblica específica, uma declaração sobre o caráter de Deus) — nunca elogios " +
+    "genéricos. Classifique o gênero da canção como testemunho, redenção, restauração, esperança em Deus, " +
+    "gratidão, confiança ou adoração; nunca como \"autoajuda\".",
   portugues:
-    "Revise a letra em português: concordância, regência, conjugação, ambiguidade, pontuação, cacofonia. " +
-    "Para cada correção, cite o trecho exato, o problema e uma sugestão. Aponte também pontos fortes.",
+    "Revise a letra em português palavra por palavra e frase por frase: ortografia, concordância, " +
+    "regência, pontuação, clareza, coerência, consistência de pessoa verbal (1ª pessoa \"eu\" vs. 1ª " +
+    "pessoa do plural \"nós\"), fluidez e prosódia. Para CADA correção, cite o trecho original exato " +
+    "(trechoOriginal), classifique o tipo e a gravidade, explique especificamente por que está incorreto " +
+    "ou confuso (nunca uma explicação vaga como \"pode melhorar a fluidez\" ou \"a concordância precisa " +
+    "ser revista\"), e ofereça pelo menos duas reescritas alternativas (opcao1, opcao2), indicando em " +
+    "observacaoDeSentido se as alternativas mudam o sentido original. Liste em problemasDeConsistencia " +
+    "qualquer alternância não intencional entre primeira pessoa do singular e do plural, ou outras " +
+    "inconsistências narrativas. Em prioridades, liste no máximo 5 correções mais importantes, em ordem, " +
+    "de forma direta e acionável. Em pontosFortes, cite elementos concretos da letra, nunca elogios vagos.",
   composicao:
     "Analise a composição: estrutura, classificação lírica, emoção predominante, energia textual, tema " +
-    "central, observações de produção, pontos fortes e sugestões.",
+    "central, observações de produção, pontos fortes e sugestões. Nos pontos fortes, cite elementos " +
+    "concretos da letra (por exemplo: progressão de uma emoção para outra, repetição de uma frase-eixo, " +
+    "linguagem acessível) — nunca elogios genéricos. Nunca classifique a canção como \"autoajuda\"; " +
+    "prefira testemunho, redenção, restauração, esperança em Deus, gratidão, confiança ou adoração.",
   congregacional:
     "Avalie o uso congregacional: adequação, facilidade de canto, clareza da mensagem, pontos fortes e " +
     "sugestões.",
@@ -446,6 +488,42 @@ function confidenceForTipo(tipo: string | undefined): ConfidenceLevel {
   }
 }
 
+// A correction is only useful if it says which passage, what's wrong, and
+// why — reject anything that reads like generic feedback with nothing
+// concrete to act on.
+const VAGUE_EXPLANATION_PHRASES = ["pode melhorar", "precisa ser revist", "pode ficar mais clar"];
+
+function isVagueExplanation(explicacao: string): boolean {
+  const normalized = explicacao.trim().toLowerCase();
+  if (normalized.length < 15) return true;
+  return VAGUE_EXPLANATION_PHRASES.some((phrase) => normalized.includes(phrase));
+}
+
+// This lyric (and others like it) is a testimony/redemption song, not
+// self-help — if a model ever mislabels it that way, correct it rather
+// than surface the label as-is.
+const SELF_HELP_LABEL_PATTERN = /auto[\s-]?ajuda/gi;
+
+function stripSelfHelpLabel(value: string): string {
+  return value.replace(SELF_HELP_LABEL_PATTERN, "testemunho de fé").trim();
+}
+
+const PORTUGUES_TIPO_TO_GRAMMAR_TYPE: Record<string, z.infer<typeof GrammarFindingTypeSchema>> = {
+  ortografia: "ortografia",
+  concordancia: "concordancia_verbal",
+  regencia: "regencia",
+  pontuacao: "pontuacao",
+  clareza: "ambiguidade",
+  coerencia: "construcao_pouco_natural",
+  pessoa_verbal: "consistencia_tempos_verbais",
+  fluidez: "construcao_pouco_natural",
+  prosodia: "palavra_dificil_de_cantar",
+};
+
+function mapPortuguesTipoToGrammarType(tipo: string): z.infer<typeof GrammarFindingTypeSchema> {
+  return PORTUGUES_TIPO_TO_GRAMMAR_TYPE[tipo] ?? "construcao_pouco_natural";
+}
+
 function mapBiblicalReferences(
   items: BiblicalAIShape["referenciasBiblicas"],
   request: AnalyzeRequest
@@ -513,13 +591,14 @@ export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShap
   const composicao = shapes.composicao;
   const congregacional = shapes.congregacional;
 
-  const messagePerceived =
+  const messagePerceived = stripSelfHelpLabel(
     firstNonEmpty(biblical?.mensagemPercebida, composicao?.temaCentral) ??
-    "Não foi possível determinar a mensagem central nesta análise.";
+      "Não foi possível determinar a mensagem central nesta análise."
+  );
 
-  const structureDisplay = composicao?.estrutura?.trim()
-    ? normalizeDisplayValue(composicao.estrutura)
-    : "Não determinado";
+  const structureDisplay = stripSelfHelpLabel(
+    composicao?.estrutura?.trim() ? normalizeDisplayValue(composicao.estrutura) : "Não determinado"
+  );
 
   const perceivedFunctions = matchEnumOrFallback(
     composicao?.classificacaoLirica,
@@ -527,7 +606,9 @@ export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShap
     ["reflexiva"]
   );
 
-  const emotionDisplay = composicao?.emocao?.trim() ? normalizeDisplayValue(composicao.emocao) : "Não determinado";
+  const emotionDisplay = stripSelfHelpLabel(
+    composicao?.emocao?.trim() ? normalizeDisplayValue(composicao.emocao) : "Não determinado"
+  );
   const lyricalEmotions = matchEnumOrFallback(composicao?.emocao, LyricalEmotionSchema.options, ["contemplativa"]);
 
   const [textualEnergy] = matchEnumOrFallback(composicao?.energiaTextual, TextualEnergySchema.options, [
@@ -543,18 +624,26 @@ export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShap
   const bibleReferences = mapBiblicalReferences(biblical?.referenciasBiblicas ?? [], request);
 
   const grammarFindings: GrammarFinding[] = (portugues?.correcoes ?? [])
-    .filter((c) => c.trecho && c.trecho.trim().length > 0)
+    .filter(
+      (c) =>
+        c.trechoOriginal &&
+        c.trechoOriginal.trim().length > 0 &&
+        !isVagueExplanation(c.explicacao)
+    )
     .map((c, i) => {
       const finding: GrammarFinding = {
-        id: `gram-${i}-${slugify(c.trecho)}`,
-        originalExcerpt: c.trecho,
-        type: "construcao_pouco_natural",
-        explanation: c.problema || c.trecho,
+        id: `gram-${i}-${slugify(c.trechoOriginal)}`,
+        originalExcerpt: c.trechoOriginal,
+        type: mapPortuguesTipoToGrammarType(c.tipo),
+        explanation: c.explicacao,
         poeticLicensePossible: false,
         classification: "erro_provavel",
         source: "ia",
+        severity: c.gravidade,
       };
-      if (c.sugestao) finding.possibleCorrection = c.sugestao;
+      if (c.opcao1) finding.possibleCorrection = c.opcao1;
+      if (c.opcao2) finding.alternativeCorrection = c.opcao2;
+      if (c.observacaoDeSentido) finding.meaningChangeNote = c.observacaoDeSentido;
       return GrammarFindingSchema.parse(finding);
     });
 
@@ -581,8 +670,17 @@ export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShap
     ...(portugues?.pontosFortes ?? []),
     ...(composicao?.pontosFortes ?? []),
     ...(congregacional?.pontosFortes ?? []),
-  ]);
+  ]).map(stripSelfHelpLabel);
   const strengths = strengthsUnion.length > 0 ? strengthsUnion : ["Não foi possível identificar pontos fortes nesta análise."];
+
+  const topPriorities = (portugues?.prioridades ?? [])
+    .filter((p) => p.trim().length > 0)
+    .slice(0, 5)
+    .map(stripSelfHelpLabel);
+  const narrativeConsistencyIssues = dedupe(portugues?.problemasDeConsistencia ?? []).map(stripSelfHelpLabel);
+  const portugueseSummary = firstNonEmpty(portugues?.resumo)
+    ? stripSelfHelpLabel(firstNonEmpty(portugues?.resumo)!)
+    : undefined;
 
   const findings = [
     ...toGeneralFindings(biblical?.observacoesTeologicas ?? [], "theological", "observation", "theo-obs"),
@@ -648,5 +746,8 @@ export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShap
     limitations: [],
     disclaimers: [],
     sectionStatus: {},
+    topPriorities,
+    narrativeConsistencyIssues,
+    portugueseSummary,
   };
 }

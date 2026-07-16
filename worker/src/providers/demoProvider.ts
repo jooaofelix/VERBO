@@ -136,6 +136,12 @@ export class DemoAIProvider implements AIAnalysisProvider {
       ],
       disclaimers: [DEMO_DISCLAIMER],
       sectionStatus: {},
+      topPriorities: [
+        "[Exemplo] Em uma análise real, as correções mais importantes apareceriam aqui, em ordem.",
+      ],
+      narrativeConsistencyIssues: [],
+      portugueseSummary:
+        "[Exemplo] Um resumo da revisão de português apareceria aqui em uma análise real.",
     };
 
     return result;

@@ -15,7 +15,7 @@ export function TopBar() {
 
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between border-b border-ink-800/10 bg-parchment-50/90 px-4 py-3 backdrop-blur dark:border-parchment-50/10 dark:bg-ink-950/90">
-      <Link to="/" className="flex items-baseline gap-2">
+      <Link to="/inicio" className="flex items-baseline gap-2">
         <span className="font-display text-lg font-semibold tracking-tight">Verbo & Canção</span>
         <span className="hidden text-xs text-ink-700/60 dark:text-parchment-100/50 sm:inline">
           apreciação e validação de letras

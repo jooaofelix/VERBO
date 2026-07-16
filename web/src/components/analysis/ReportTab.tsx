@@ -81,29 +81,67 @@ export function ReportTab({ song, version, result }: Props) {
         <div className="mt-3 flex flex-col gap-3">
           <ReportBlock title="Intenção declarada" items={[report.declaredIntent]} />
           <ReportBlock title="Mensagem percebida" items={[report.perceivedMessage]} />
-          <ReportBlock title="Pontos fortes" items={report.strengths} />
-          <ReportBlock title="Pontos de atenção" items={report.attentionPoints} />
+
+          <ReportBlock title="O que corrigir primeiro" items={report.topPriorities} ordered />
+          <ReportBlock title="Revisão linha por linha" items={report.lineByLineReview} />
+          <ReportBlock title="Consistência da narrativa" items={report.narrativeConsistencyNotes} />
+          <ReportBlock title="Sugestões de reescrita" items={report.rewriteSuggestions} />
+          <ReportBlock title="Pontos fortes da letra" items={report.strengths} />
+          <ReportBlock
+            title="Análise bíblica e teológica"
+            items={[
+              ...report.bibleReferences.map(
+                (r) => `${r.referenceLabel}${r.verseText ? `: "${r.verseText}"` : ""}`
+              ),
+              ...report.biblicalContextNotes,
+              ...report.theologicalObservations,
+              ...report.attentionPoints,
+            ]}
+          />
+          <ReportBlock
+            title="Estrutura e composição"
+            items={[
+              `Estrutura: ${report.structureOverview}`,
+              `Classificação lírica: ${report.lyricalClassification}`,
+              `Emoção predominante: ${report.emotion}`,
+              ...report.compositionObservations,
+              ...report.productionObservations,
+            ]}
+          />
+          <ReportBlock title="Adequação congregacional" items={[report.congregationalFit]} />
           <ReportBlock title="Perguntas pendentes" items={report.pendingQuestions} />
-          <ReportBlock title="Sugestões prioritárias" items={report.prioritySuggestions} />
-          <ReportBlock title="Limitações desta análise" items={report.limitations} />
+          <ReportBlock title="Limitações" items={report.limitations} />
         </div>
       </div>
     </div>
   );
 }
 
-function ReportBlock({ title, items }: { title: string; items: string[] }) {
+function ReportBlock({
+  title,
+  items,
+  ordered = false,
+}: {
+  title: string;
+  items: string[];
+  ordered?: boolean;
+}) {
   if (items.length === 0) return null;
+  const ListTag = ordered ? "ol" : "ul";
   return (
     <div>
       <p className="text-xs font-medium uppercase text-ink-700/50 dark:text-parchment-100/40">
         {title}
       </p>
-      <ul className="mt-1 list-disc pl-5 text-ink-700/80 dark:text-parchment-100/70">
+      <ListTag
+        className={`mt-1 pl-5 text-ink-700/80 dark:text-parchment-100/70 ${
+          ordered ? "list-decimal" : "list-disc"
+        }`}
+      >
         {items.map((item, i) => (
           <li key={i}>{item}</li>
         ))}
-      </ul>
+      </ListTag>
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "../services/firebase/firestore.js";
+import { normalizeLegacyVersion } from "../lib/legacyNormalize.js";
 import type { VersionDoc, WithId } from "../types/firestore.js";
 
 function versionsCollection(uid: string, songId: string) {
@@ -90,27 +91,37 @@ export async function getVersion(
   versionId: string
 ): Promise<WithId<VersionDoc> | null> {
   const snap = await getDoc(versionDoc(uid, songId, versionId));
-  return snap.exists() ? { id: snap.id, ...(snap.data() as VersionDoc) } : null;
+  return snap.exists() ? normalizeLegacyVersion(snap.id, snap.data()) : null;
 }
 
 export function subscribeToVersions(
   uid: string,
   songId: string,
-  callback: (versions: WithId<VersionDoc>[]) => void
+  callback: (versions: WithId<VersionDoc>[]) => void,
+  onError?: (error: Error) => void
 ): Unsubscribe {
   const q = query(versionsCollection(uid, songId), orderBy("createdAt", "asc"));
-  return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as VersionDoc) })));
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      callback(snapshot.docs.map((d) => normalizeLegacyVersion(d.id, d.data())));
+    },
+    (error) => onError?.(error)
+  );
 }
 
 export function subscribeToVersion(
   uid: string,
   songId: string,
   versionId: string,
-  callback: (version: WithId<VersionDoc> | null) => void
+  callback: (version: WithId<VersionDoc> | null) => void,
+  onError?: (error: Error) => void
 ): Unsubscribe {
-  return onSnapshot(versionDoc(uid, songId, versionId), (snap) => {
-    callback(snap.exists() ? { id: snap.id, ...(snap.data() as VersionDoc) } : null);
-  });
+  return onSnapshot(
+    versionDoc(uid, songId, versionId),
+    (snap) => {
+      callback(snap.exists() ? normalizeLegacyVersion(snap.id, snap.data()) : null);
+    },
+    (error) => onError?.(error)
+  );
 }

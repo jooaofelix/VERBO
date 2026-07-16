@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { BottomNav } from "./components/BottomNav.js";
+import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { ProtectedRoute } from "./components/ProtectedRoute.js";
 import { TopBar } from "./components/TopBar.js";
 import { About } from "./routes/About.js";
 import { CompareVersions } from "./routes/CompareVersions.js";
 import { ForgotPassword } from "./routes/ForgotPassword.js";
-import { Library } from "./routes/Library.js";
+import { Home } from "./routes/Home.js";
 import { Login } from "./routes/Login.js";
 import { NewAnalysis } from "./routes/NewAnalysis.js";
 import { Onboarding } from "./routes/Onboarding.js";
+import { ProjectView } from "./routes/ProjectView.js";
+import { Projects } from "./routes/Projects.js";
 import { Signup } from "./routes/Signup.js";
 import { VersionView } from "./routes/VersionView.js";
 
@@ -53,41 +56,87 @@ export default function App() {
     <div className="flex min-h-dvh flex-col">
       <TopBar />
       <main className="flex-1 pb-24">
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Library />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/nova"
-            element={
-              <ProtectedRoute>
-                <NewAnalysis />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/musicas/:songId/versoes/:versionId"
-            element={
-              <ProtectedRoute>
-                <VersionView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/musicas/:songId/comparar"
-            element={
-              <ProtectedRoute>
-                <CompareVersions />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/sobre" element={<About />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<Navigate to="/inicio" replace />} />
+            <Route
+              path="/inicio"
+              element={
+                <ProtectedRoute>
+                  <Home />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/projetos"
+              element={
+                <ProtectedRoute>
+                  <Projects />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/projetos/:projectId"
+              element={
+                <ProtectedRoute>
+                  <ProjectView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analises/nova"
+              element={
+                <ProtectedRoute>
+                  <NewAnalysis />
+                </ProtectedRoute>
+              }
+            />
+            {/* Legacy path kept as an alias so old links/bookmarks keep working. */}
+            <Route
+              path="/nova"
+              element={
+                <ProtectedRoute>
+                  <NewAnalysis />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/projetos/:projectId/versoes/:versionId"
+              element={
+                <ProtectedRoute>
+                  <VersionView />
+                </ProtectedRoute>
+              }
+            />
+            {/* Legacy path kept as an alias so old links/bookmarks keep working. */}
+            <Route
+              path="/musicas/:songId/versoes/:versionId"
+              element={
+                <ProtectedRoute>
+                  <VersionView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/projetos/:projectId/comparar"
+              element={
+                <ProtectedRoute>
+                  <CompareVersions />
+                </ProtectedRoute>
+              }
+            />
+            {/* Legacy path kept as an alias so old links/bookmarks keep working. */}
+            <Route
+              path="/musicas/:songId/comparar"
+              element={
+                <ProtectedRoute>
+                  <CompareVersions />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/sobre" element={<About />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
       <BottomNav />
     </div>

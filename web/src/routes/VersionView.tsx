@@ -15,7 +15,10 @@ import { analyzeLyrics } from "../services/worker/client.js";
 type Tab = "letra" | "analise" | "versoes";
 
 export function VersionView() {
-  const { songId, versionId } = useParams();
+  // Registered under two route patterns — the canonical /projetos/:projectId/...
+  // and the legacy /musicas/:songId/... alias — so accept whichever param is present.
+  const { songId: songIdParam, projectId, versionId } = useParams();
+  const songId = songIdParam ?? projectId;
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -46,8 +49,8 @@ export function VersionView() {
     return (
       <div className="mx-auto max-w-xl px-4 py-10 text-center">
         <p>Composição ou versão não encontrada, ou você não tem acesso a ela.</p>
-        <Link to="/" className="mt-3 inline-block text-verse-600 underline dark:text-verse-400">
-          Voltar para a biblioteca
+        <Link to="/projetos" className="mt-3 inline-block text-verse-600 underline dark:text-verse-400">
+          Voltar aos projetos
         </Link>
       </div>
     );
@@ -80,7 +83,7 @@ export function VersionView() {
       context: version!.context,
       sourceVersionId: version!.id,
     });
-    navigate(`/musicas/${songId}/versoes/${newVersionId}`);
+    navigate(`/projetos/${songId}/versoes/${newVersionId}`);
   }
 
   return (
@@ -166,7 +169,7 @@ export function VersionView() {
               </button>
               {versions.length >= 2 && (
                 <Link
-                  to={`/musicas/${songId}/comparar`}
+                  to={`/projetos/${songId}/comparar`}
                   className="rounded-lg border border-verse-500/40 px-3 py-1.5 text-sm text-verse-600 dark:text-verse-400"
                 >
                   Comparar versões
@@ -184,7 +187,7 @@ export function VersionView() {
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Link to={`/musicas/${songId}/versoes/${v.id}`} className="font-medium hover:underline">
+                    <Link to={`/projetos/${songId}/versoes/${v.id}`} className="font-medium hover:underline">
                       {v.versionName}
                     </Link>
                     <div className="flex items-center gap-2 text-xs">

@@ -9,6 +9,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "../services/firebase/firestore.js";
+import { normalizeLegacyAnalysis } from "../lib/legacyNormalize.js";
 import type { AnalysisDoc, WithId } from "../types/firestore.js";
 
 function analysisDoc(uid: string, songId: string, analysisId: string) {
@@ -21,18 +22,23 @@ export async function getAnalysis(
   analysisId: string
 ): Promise<WithId<AnalysisDoc> | null> {
   const snap = await getDoc(analysisDoc(uid, songId, analysisId));
-  return snap.exists() ? { id: snap.id, ...(snap.data() as AnalysisDoc) } : null;
+  return snap.exists() ? normalizeLegacyAnalysis(snap.id, snap.data()) : null;
 }
 
 export function subscribeToAnalysis(
   uid: string,
   songId: string,
   analysisId: string,
-  callback: (analysis: WithId<AnalysisDoc> | null) => void
+  callback: (analysis: WithId<AnalysisDoc> | null) => void,
+  onError?: (error: Error) => void
 ): Unsubscribe {
-  return onSnapshot(analysisDoc(uid, songId, analysisId), (snap) => {
-    callback(snap.exists() ? { id: snap.id, ...(snap.data() as AnalysisDoc) } : null);
-  });
+  return onSnapshot(
+    analysisDoc(uid, songId, analysisId),
+    (snap) => {
+      callback(snap.exists() ? normalizeLegacyAnalysis(snap.id, snap.data()) : null);
+    },
+    (error) => onError?.(error)
+  );
 }
 
 /**

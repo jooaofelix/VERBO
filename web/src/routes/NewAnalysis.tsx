@@ -76,7 +76,7 @@ export function NewAnalysis() {
       });
       await saveAnalysisResult(user.uid, songId, versionId, mode, result);
 
-      navigate(`/musicas/${songId}/versoes/${versionId}`);
+      navigate(`/projetos/${songId}/versoes/${versionId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível concluir a análise agora.");
     } finally {

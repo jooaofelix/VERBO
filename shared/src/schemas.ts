@@ -211,6 +211,8 @@ export const GrammarClassificationSchema = z.enum([
   "nao_determinado_sem_melodia",
 ]);
 
+export const GrammarSeveritySchema = z.enum(["baixa", "media", "alta"]);
+
 export const GrammarFindingSchema = z.object({
   id: z.string(),
   sectionId: z.string().optional(),
@@ -218,6 +220,11 @@ export const GrammarFindingSchema = z.object({
   type: GrammarFindingTypeSchema,
   explanation: z.string(),
   possibleCorrection: z.string().optional(),
+  /** A second rewrite option, distinct from possibleCorrection, when more than one reasonable fix exists. */
+  alternativeCorrection: z.string().optional(),
+  /** Whether — and how — the suggested rewrite(s) change the original meaning, not just the wording. */
+  meaningChangeNote: z.string().optional(),
+  severity: GrammarSeveritySchema.optional(),
   metricImpact: z.string().optional(),
   poeticLicensePossible: z.boolean(),
   classification: GrammarClassificationSchema,
@@ -555,6 +562,14 @@ export const FinalReportSchema = z.object({
   versionName: z.string(),
   analyzedAt: z.string(),
   declaredIntent: z.string(),
+  /** "O que corrigir primeiro" — up to 5 concrete, ordered priorities. */
+  topPriorities: z.array(z.string()).max(5).default([]),
+  /** "Revisão linha por linha" — one formatted entry per grammar/wording correction. */
+  lineByLineReview: z.array(z.string()).default([]),
+  /** "Consistência da narrativa" — e.g. an unresolved "eu"/"nós" shift. */
+  narrativeConsistencyNotes: z.array(z.string()).default([]),
+  /** "Sugestões de reescrita" — concrete alternative phrasings pulled out of the line-by-line review. */
+  rewriteSuggestions: z.array(z.string()).default([]),
   perceivedMessage: z.string(),
   structureOverview: z.string(),
   lyricalClassification: z.string(),
@@ -604,6 +619,12 @@ export const AnalysisResultSchema = z.object({
    * area of a multi-call analysis times out.
    */
   sectionStatus: z.record(z.string(), SectionStatusValueSchema).default({}),
+  /** Up to 5 concrete, actionable fixes, ordered by priority — "O que corrigir primeiro". */
+  topPriorities: z.array(z.string()).max(5).default([]),
+  /** e.g. an unresolved shift between first-person singular and plural ("eu" vs. "nós") across the lyric. */
+  narrativeConsistencyIssues: z.array(z.string()).default([]),
+  /** A short overview of the Portuguese-language review, when that area ran. */
+  portugueseSummary: z.string().optional(),
 });
 
 /**
@@ -630,6 +651,9 @@ export const AIProducedAnalysisSchema = z.object({
   limitations: z.array(z.string()).default([]),
   disclaimers: z.array(z.string()).default([]),
   sectionStatus: z.record(z.string(), SectionStatusValueSchema).default({}),
+  topPriorities: z.array(z.string()).max(5).default([]),
+  narrativeConsistencyIssues: z.array(z.string()).default([]),
+  portugueseSummary: z.string().optional(),
 });
 
 export const AnalyzeResponseSchema = z.object({

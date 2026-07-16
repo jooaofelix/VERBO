@@ -1,20 +1,29 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { friendlyAuthErrorMessage } from "../lib/authErrors.js";
-import { signInAsDemoUser, signInWithEmail, signInWithGoogle } from "../services/firebase/auth.js";
+import { Link, useNavigate } from "react-router-dom";
+import { authErrorCode, friendlyAuthErrorMessage } from "../lib/authErrors.js";
+import {
+  signInAsDemoUser,
+  signInWithEmail,
+  signInWithGooglePopup,
+  signInWithGoogleRedirect,
+} from "../services/firebase/auth.js";
 
 const inputClass =
   "rounded-lg border border-ink-800/15 bg-white/70 px-3 py-2 text-sm outline-none focus:border-verse-500 dark:border-parchment-50/15 dark:bg-ink-900/60";
 
+interface GoogleFailure {
+  code: string;
+  message: string;
+}
+
 export function Login() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const from = (location.state as { from?: Location })?.from?.pathname ?? "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<"" | "email" | "google" | "demo">("");
+  const [loading, setLoading] = useState<"" | "email" | "google" | "demo" | "redirect">("");
+  const [googleFailure, setGoogleFailure] = useState<GoogleFailure | null>(null);
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -22,7 +31,7 @@ export function Login() {
     setLoading("email");
     try {
       await signInWithEmail(email, password);
-      navigate(from, { replace: true });
+      navigate("/inicio", { replace: true });
     } catch (err) {
       setError(friendlyAuthErrorMessage(err));
     } finally {
@@ -30,17 +39,36 @@ export function Login() {
     }
   }
 
-  async function handleGoogleLogin() {
+  // Deliberately not `async` and calling signInWithGooglePopup as the very
+  // first statement: some browsers only allow a popup to open inside the
+  // same event-loop turn as the click that triggered it, so nothing may be
+  // `await`ed before this call.
+  function handleGoogleLogin() {
     setError(null);
+    setGoogleFailure(null);
     setLoading("google");
-    try {
-      await signInWithGoogle();
-      navigate(from, { replace: true });
-    } catch (err) {
-      setError(friendlyAuthErrorMessage(err));
-    } finally {
+    signInWithGooglePopup()
+      .then(() => {
+        navigate("/inicio", { replace: true });
+      })
+      .catch((err: unknown) => {
+        setGoogleFailure({ code: authErrorCode(err), message: friendlyAuthErrorMessage(err) });
+      })
+      .finally(() => setLoading(""));
+  }
+
+  // A manual, explicit fallback only — never triggered automatically when
+  // the popup closes, which would risk a redirect loop.
+  function handleGoogleRedirect() {
+    setGoogleFailure(null);
+    setLoading("redirect");
+    signInWithGoogleRedirect().catch((err: unknown) => {
       setLoading("");
-    }
+      setGoogleFailure({ code: authErrorCode(err), message: friendlyAuthErrorMessage(err) });
+    });
+    // On success the browser navigates away to Google; there is nothing
+    // further to do here — completeGoogleRedirectSignIn() picks it up on
+    // the way back, in AuthProvider.
   }
 
   async function handleDemoLogin() {
@@ -48,7 +76,7 @@ export function Login() {
     setLoading("demo");
     try {
       await signInAsDemoUser();
-      navigate(from, { replace: true });
+      navigate("/inicio", { replace: true });
     } catch (err) {
       setError(friendlyAuthErrorMessage(err));
     } finally {
@@ -116,6 +144,36 @@ export function Login() {
       >
         {loading === "google" ? "Conectando..." : "Entrar com Google"}
       </button>
+
+      {googleFailure && (
+        <div
+          role="alert"
+          className="flex flex-col gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300"
+        >
+          <p>{googleFailure.message}</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-medium"
+            >
+              Tentar novamente
+            </button>
+            <button
+              type="button"
+              onClick={handleGoogleRedirect}
+              disabled={loading === "redirect"}
+              className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            >
+              {loading === "redirect" ? "Abrindo..." : "Entrar em tela inteira"}
+            </button>
+          </div>
+          <details className="text-xs opacity-70">
+            <summary className="cursor-pointer">Ver detalhes</summary>
+            <p className="mt-1 font-mono">{googleFailure.code}</p>
+          </details>
+        </div>
+      )}
 
       <button
         type="button"

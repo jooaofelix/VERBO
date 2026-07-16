@@ -35,6 +35,18 @@ const CLASSIFICATION_CLASS: Record<GrammarFinding["classification"], string> = {
   nao_determinado_sem_melodia: "bg-ink-800/10 text-ink-700 dark:bg-parchment-50/10 dark:text-parchment-100/70",
 };
 
+const SEVERITY_LABEL: Record<"baixa" | "media" | "alta", string> = {
+  baixa: "Gravidade baixa",
+  media: "Gravidade média",
+  alta: "Gravidade alta",
+};
+
+const SEVERITY_CLASS: Record<"baixa" | "media" | "alta", string> = {
+  baixa: "bg-slate-400/15 text-slate-600 dark:text-slate-300",
+  media: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  alta: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
+};
+
 function GrammarFindingRow({ finding }: { finding: GrammarFinding }) {
   return (
     <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 text-sm">
@@ -45,6 +57,11 @@ function GrammarFindingRow({ finding }: { finding: GrammarFinding }) {
         <span className={`rounded-full px-2 py-0.5 text-xs ${CLASSIFICATION_CLASS[finding.classification]}`}>
           {CLASSIFICATION_LABEL[finding.classification]}
         </span>
+        {finding.severity && (
+          <span className={`rounded-full px-2 py-0.5 text-xs ${SEVERITY_CLASS[finding.severity]}`}>
+            {SEVERITY_LABEL[finding.severity]}
+          </span>
+        )}
         {finding.source === "deterministico" && (
           <span className="rounded-full bg-ink-800/10 px-2 py-0.5 text-xs dark:bg-parchment-50/10">
             checagem automática
@@ -57,8 +74,19 @@ function GrammarFindingRow({ finding }: { finding: GrammarFinding }) {
       <p className="mt-1.5 text-ink-700/80 dark:text-parchment-100/70">{finding.explanation}</p>
       {finding.possibleCorrection && (
         <p className="mt-1.5">
-          <span className="font-medium">Possível correção: </span>
+          <span className="font-medium">Opção 1: </span>
           {finding.possibleCorrection}
+        </p>
+      )}
+      {finding.alternativeCorrection && (
+        <p className="mt-1">
+          <span className="font-medium">Opção 2: </span>
+          {finding.alternativeCorrection}
+        </p>
+      )}
+      {finding.meaningChangeNote && (
+        <p className="mt-1.5 text-xs text-ink-700/60 dark:text-parchment-100/50">
+          {finding.meaningChangeNote}
         </p>
       )}
       {finding.metricImpact && (

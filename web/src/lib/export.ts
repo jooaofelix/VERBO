@@ -4,26 +4,36 @@ function reportSections(report: FinalReport): Array<[string, string[]]> {
   return [
     ["Intenção declarada", [report.declaredIntent]],
     ["Mensagem percebida", [report.perceivedMessage]],
-    ["Estrutura", [report.structureOverview]],
-    ["Classificação lírica", [report.lyricalClassification]],
-    ["Emoção", [report.emotion]],
+    ["O que corrigir primeiro", report.topPriorities],
+    ["Revisão linha por linha", report.lineByLineReview],
+    ["Consistência da narrativa", report.narrativeConsistencyNotes],
+    ["Sugestões de reescrita", report.rewriteSuggestions],
+    ["Pontos fortes da letra", report.strengths],
     [
-      "Referências bíblicas",
-      report.bibleReferences.length > 0
-        ? report.bibleReferences.map((r) => `${r.referenceLabel} (${r.relationType}) — ${r.explanation}`)
-        : ["Nenhuma referência bíblica direta identificada."],
+      "Análise bíblica e teológica",
+      [
+        ...(report.bibleReferences.length > 0
+          ? report.bibleReferences.map((r) => `${r.referenceLabel} (${r.relationType}) — ${r.explanation}`)
+          : ["Nenhuma referência bíblica direta identificada."]),
+        ...report.biblicalContextNotes,
+        ...report.theologicalObservations,
+        ...report.attentionPoints,
+      ],
     ],
-    ["Contexto bíblico", report.biblicalContextNotes],
-    ["Observações teológicas", report.theologicalObservations],
-    ["Observações linguísticas", report.linguisticObservations],
-    ["Observações de composição", report.compositionObservations],
-    ["Observações de produção", report.productionObservations],
+    [
+      "Estrutura e composição",
+      [
+        `Estrutura: ${report.structureOverview}`,
+        `Classificação lírica: ${report.lyricalClassification}`,
+        `Emoção predominante: ${report.emotion}`,
+        ...report.compositionObservations,
+        ...report.productionObservations,
+      ],
+    ],
     ["Adequação congregacional", [report.congregationalFit]],
-    ["Pontos fortes", report.strengths],
-    ["Pontos de atenção", report.attentionPoints],
     ["Perguntas pendentes ao compositor", report.pendingQuestions],
-    ["Sugestões prioritárias", report.prioritySuggestions],
-    ["Limitações desta análise", report.limitations],
+    ["Sugestões prioritárias (todas as áreas)", report.prioritySuggestions],
+    ["Limitações", report.limitations],
   ];
 }
 

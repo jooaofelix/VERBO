@@ -20,7 +20,7 @@ export function Signup() {
     setLoading(true);
     try {
       await signUpWithEmail(email, password, name || undefined);
-      navigate("/", { replace: true });
+      navigate("/inicio", { replace: true });
     } catch (err) {
       setError(friendlyAuthErrorMessage(err));
     } finally {

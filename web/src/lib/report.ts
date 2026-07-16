@@ -1,4 +1,4 @@
-import type { AnalysisResult, FinalReport } from "@verbo/shared";
+import type { AnalysisResult, FinalReport, GrammarFinding } from "@verbo/shared";
 import type { SongDoc, VersionDoc, WithId } from "../types/firestore.js";
 
 const FIXED_LIMITATIONS = [
@@ -7,6 +7,25 @@ const FIXED_LIMITATIONS = [
   "O texto bíblico exibido, quando disponível, vem de um conjunto pequeno e curado de versículos de domínio público — não é uma Bíblia completa.",
   "Este relatório não constitui registro legal de direitos autorais.",
 ];
+
+function formatGrammarFinding(g: GrammarFinding): string {
+  const parts = [`"${g.originalExcerpt}"`];
+  if (g.severity) parts.push(`(gravidade: ${g.severity})`);
+  parts.push(`— ${g.explanation}`);
+  if (g.possibleCorrection) parts.push(`Sugestão: "${g.possibleCorrection}"`);
+  if (g.alternativeCorrection) parts.push(`Outra opção: "${g.alternativeCorrection}"`);
+  if (g.meaningChangeNote) parts.push(`(${g.meaningChangeNote})`);
+  return parts.join(" ");
+}
+
+function rewriteSuggestionsFor(findings: GrammarFinding[]): string[] {
+  return findings.flatMap((g) => {
+    const options = [g.possibleCorrection, g.alternativeCorrection].filter(
+      (v): v is string => Boolean(v)
+    );
+    return options.map((option) => `"${g.originalExcerpt}" → "${option}"`);
+  });
+}
 
 function describeIntent(version: WithId<VersionDoc>): string {
   const c = version.context ?? ({} as VersionDoc["context"]);
@@ -37,6 +56,10 @@ export function buildFinalReport(
     versionName: version.versionName ?? "Versão",
     analyzedAt: result.createdAt,
     declaredIntent: describeIntent(version),
+    topPriorities: result.topPriorities,
+    lineByLineReview: result.grammarFindings.map(formatGrammarFinding),
+    narrativeConsistencyNotes: result.narrativeConsistencyIssues,
+    rewriteSuggestions: rewriteSuggestionsFor(result.grammarFindings),
     perceivedMessage: result.overview.perceivedCentralMessage,
     structureOverview: result.overview.compositionType,
     lyricalClassification: result.mood.perceivedFunctions.join(", "),

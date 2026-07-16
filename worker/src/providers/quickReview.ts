@@ -115,5 +115,7 @@ export function quickReviewToAIProducedAnalysis(q: QuickReview): AIProducedAnaly
     ],
     disclaimers: [],
     sectionStatus: {},
+    topPriorities: q.correcoesPrioritarias.slice(0, 5),
+    narrativeConsistencyIssues: [],
   };
 }

@@ -28,7 +28,13 @@ import {
   quickUserPayload,
 } from "./quickReview.js";
 
-const MODEL = "@cf/meta/llama-3.2-3b-instruct";
+const MODEL_DEFAULT = "@cf/meta/llama-3.2-3b-instruct";
+// "Português" is the one area that gets a bigger, slower model — it's a
+// single isolated call, and generic explanations ("pode melhorar a
+// fluidez") aren't acceptable, so it needs the extra capability. Every
+// other area (and this area's own timeout retry) stays on the 3B model to
+// avoid reintroducing the timeouts a bigger model everywhere used to cause.
+const MODEL_PORTUGUES = "@cf/meta/llama-3.1-8b-instruct-fast";
 
 const QUICK_TEMPERATURE = 0.1;
 const QUICK_MAX_TOKENS = 500;
@@ -38,6 +44,10 @@ const AREA_TEMPERATURE = 0.15;
 const AREA_MAX_TOKENS_COMPLETA = 500;
 const AREA_MAX_TOKENS_INDIVIDUAL = 650;
 const AREA_RETRY_MAX_TOKENS = 350;
+
+const PORTUGUES_TEMPERATURE = 0.1;
+const PORTUGUES_MAX_TOKENS = 750;
+const PORTUGUES_RETRY_MAX_TOKENS = 450;
 
 const TIMEOUT_MESSAGE = "Esta parte da análise demorou mais que o esperado. Tente novamente.";
 const FORMAT_INVALID_MESSAGE = "A resposta desta seção não pôde ser processada.";
@@ -175,14 +185,21 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     sections: SongSection[],
     maxTokens: number
   ): Promise<{ status: "ok" | "timeout" | "formato_invalido" | "indisponivel"; data: AreaAIShape }> {
-    console.log("analyze section start", { area, attempt: 1 });
+    const isPortugues = area === "portugues";
+    const primaryModel = isPortugues ? MODEL_PORTUGUES : MODEL_DEFAULT;
+    const primaryTemperature = isPortugues ? PORTUGUES_TEMPERATURE : AREA_TEMPERATURE;
+    const primaryMaxTokens = isPortugues ? PORTUGUES_MAX_TOKENS : maxTokens;
+
+    console.log("analyze section start", { area, attempt: 1, model: primaryModel });
     const first = await this.attemptArea(
       area,
       [
         { role: "system", content: AREA_SYSTEM_PROMPT },
         { role: "user", content: areaUserPayload(area, request, sections) },
       ],
-      maxTokens
+      primaryMaxTokens,
+      primaryModel,
+      primaryTemperature
     );
     if (first.kind === "ok") {
       console.log("analyze section success", { area, attempt: 1 });
@@ -192,14 +209,24 @@ export class WorkersAIProvider implements AIAnalysisProvider {
 
     // Exactly one retry, regardless of why the first attempt failed — never
     // the same full call again, always the smaller prompt/budget below.
-    console.log("analyze section start", { area, attempt: 2 });
+    // "Português" always falls back to the 3B model on retry, even though
+    // its primary attempt uses the bigger one — that's what keeps this
+    // area from reintroducing the timeouts a bigger model everywhere used
+    // to cause.
+    const retryModel = MODEL_DEFAULT;
+    const retryTemperature = isPortugues ? PORTUGUES_TEMPERATURE : AREA_TEMPERATURE;
+    const retryMaxTokens = isPortugues ? PORTUGUES_RETRY_MAX_TOKENS : AREA_RETRY_MAX_TOKENS;
+
+    console.log("analyze section start", { area, attempt: 2, model: retryModel });
     const retry = await this.attemptArea(
       area,
       [
         { role: "system", content: AREA_SYSTEM_PROMPT_RETRY },
         { role: "user", content: areaRetryUserPayload(area, sections) },
       ],
-      AREA_RETRY_MAX_TOKENS
+      retryMaxTokens,
+      retryModel,
+      retryTemperature
     );
     if (retry.kind === "ok") {
       console.log("analyze section success", { area, attempt: 2 });
@@ -212,10 +239,16 @@ export class WorkersAIProvider implements AIAnalysisProvider {
   }
 
   /** Runs one model call for an area and classifies the outcome — never throws. */
-  private async attemptArea(area: Area, messages: ChatMessage[], maxTokens: number): Promise<AttemptOutcome> {
+  private async attemptArea(
+    area: Area,
+    messages: ChatMessage[],
+    maxTokens: number,
+    model: string,
+    temperature: number
+  ): Promise<AttemptOutcome> {
     let res: { parsed: unknown; text: string };
     try {
-      res = await this.runModel(messages, maxTokens, AREA_TEMPERATURE, areaJsonSchema(area));
+      res = await this.runModel(messages, maxTokens, temperature, areaJsonSchema(area), model);
     } catch (err) {
       return isTimeoutError(err) ? { kind: "timeout" } : { kind: "erro" };
     }
@@ -237,9 +270,10 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     messages: ChatMessage[],
     maxTokens: number,
     temperature: number,
-    jsonSchema: unknown
+    jsonSchema: unknown,
+    model: string = MODEL_DEFAULT
   ): Promise<{ parsed: unknown; text: string }> {
-    const result = (await this.ai.run(MODEL as never, {
+    const result = (await this.ai.run(model as never, {
       messages,
       // A small, area-specific JSON Schema — never the whole AnalysisResult
       // schema — drives Workers AI's native structured-output mode.

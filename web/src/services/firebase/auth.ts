@@ -2,6 +2,7 @@ import {
   browserLocalPersistence,
   createUserWithEmailAndPassword,
   getAuth,
+  getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -9,6 +10,7 @@ import {
   signInAnonymously,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   updateProfile,
   type User,
@@ -18,16 +20,48 @@ import { firebaseApp } from "./app.js";
 export const auth = getAuth(firebaseApp);
 
 // Session persists across browser restarts (not just the tab) until the
-// user explicitly logs out.
-void setPersistence(auth, browserLocalPersistence);
+// user explicitly logs out. Kept as an awaitable promise (instead of a
+// fire-and-forget `void`) so callers that need the guarantee — e.g. before
+// a redirect sign-in survives a full page reload — can await it, without
+// this module-load call itself blocking anything.
+export const localPersistenceReady: Promise<void> = setPersistence(auth, browserLocalPersistence);
 
 export function subscribeToAuthState(callback: (user: User | null) => void): () => void {
   return onAuthStateChanged(auth, callback);
 }
 
-export async function signInWithGoogle(): Promise<User> {
-  const credential = await signInWithPopup(auth, new GoogleAuthProvider());
-  return credential.user;
+/**
+ * Forces Google's account chooser every time instead of silently trying to
+ * reuse a stale/incomplete session — that silent reuse is what produced an
+ * empty popup that closed itself with no visible error.
+ */
+export function createGoogleProvider(): GoogleAuthProvider {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  return provider;
+}
+
+/**
+ * Must be invoked synchronously from the click handler that triggers it —
+ * with nothing `await`ed first — because some browsers only allow a popup
+ * to open inside the same event-loop turn as the user gesture.
+ */
+export function signInWithGooglePopup(): Promise<User> {
+  return signInWithPopup(auth, createGoogleProvider()).then((credential) => credential.user);
+}
+
+/** Full-page fallback for when the popup itself is blocked or keeps failing. */
+export function signInWithGoogleRedirect(): Promise<never> {
+  return signInWithRedirect(auth, createGoogleProvider()) as Promise<never>;
+}
+
+/**
+ * Must run once at app startup, and its result awaited before concluding
+ * the user isn't authenticated — a sign-in started via signInWithRedirect
+ * only resolves here, after the full-page round trip back from Google.
+ */
+export function completeGoogleRedirectSignIn(): Promise<User | null> {
+  return getRedirectResult(auth).then((credential) => credential?.user ?? null);
 }
 
 export async function signUpWithEmail(
