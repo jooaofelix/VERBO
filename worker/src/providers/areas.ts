@@ -187,7 +187,71 @@ function stripCodeFence(text: string): string {
   return fenced ? fenced[1] : trimmed;
 }
 
-/** Scans for the first balanced {...} object in the text, ignoring braces inside strings. */
+/**
+ * When Workers AI's max_tokens budget cuts the model off mid-object, the
+ * JSON is truncated but everything generated before the cut is usually
+ * still well-formed. Rather than discard the whole response (and every
+ * already-complete correção/referência/observação in it), this trims back
+ * to the last point where doing so still yields valid JSON — right before a
+ * dangling comma, or right after a container that had already fully
+ * closed — and closes off whatever brackets were still open at that point.
+ * Returns undefined if nothing was salvageable at all.
+ */
+function repairTruncatedJson(text: string, start: number): unknown {
+  const stack: Array<"{" | "["> = [];
+  let inString = false;
+  let escape = false;
+  let cut = -1;
+  let cutStack: Array<"{" | "["> = [];
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "{" || ch === "[") {
+      // Opening a container is deliberately NOT recorded as a safe cut
+      // point: an object that never got far enough to include its own
+      // required fields (e.g. a correção missing trechoOriginal) would
+      // otherwise survive as a syntactically-valid-but-incomplete item and
+      // invalidate the whole array once it fails schema validation. Only
+      // cutting at a point where the current value had already fully
+      // finished (a comma, or a container that already closed) guarantees
+      // every salvaged item is exactly as complete as the model left it.
+      stack.push(ch);
+    } else if (ch === "}" || ch === "]") {
+      stack.pop();
+      cut = i + 1;
+      cutStack = [...stack];
+    } else if (ch === ",") {
+      cut = i;
+      cutStack = [...stack];
+    }
+  }
+
+  if (cut === -1) return undefined;
+
+  const closing = cutStack
+    .slice()
+    .reverse()
+    .map((bracket) => (bracket === "{" ? "}" : "]"))
+    .join("");
+
+  try {
+    return JSON.parse(text.slice(start, cut) + closing);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Scans for the first balanced {...} object in the text, ignoring braces inside strings. Falls back to repairTruncatedJson() before giving up. */
 function extractFirstJsonObject(text: string): unknown {
   const start = text.indexOf("{");
   if (start === -1) throw new Error("Resposta sem objeto JSON.");
@@ -215,6 +279,9 @@ function extractFirstJsonObject(text: string): unknown {
       }
     }
   }
+
+  const repaired = repairTruncatedJson(text, start);
+  if (repaired !== undefined) return repaired;
   throw new Error("Objeto JSON incompleto na resposta.");
 }
 
@@ -324,14 +391,16 @@ const AREA_FOCUS: Record<Area, string> = {
   portugues:
     "Revise a letra em português palavra por palavra e frase por frase: ortografia, concordância, " +
     "regência, pontuação, clareza, coerência, consistência de pessoa verbal (1ª pessoa \"eu\" vs. 1ª " +
-    "pessoa do plural \"nós\"), fluidez e prosódia. Para CADA correção, cite o trecho original exato " +
-    "(trechoOriginal), classifique o tipo e a gravidade, explique especificamente por que está incorreto " +
-    "ou confuso (nunca uma explicação vaga como \"pode melhorar a fluidez\" ou \"a concordância precisa " +
-    "ser revista\"), e ofereça pelo menos duas reescritas alternativas (opcao1, opcao2), indicando em " +
-    "observacaoDeSentido se as alternativas mudam o sentido original. Liste em problemasDeConsistencia " +
-    "qualquer alternância não intencional entre primeira pessoa do singular e do plural, ou outras " +
-    "inconsistências narrativas. Em prioridades, liste no máximo 5 correções mais importantes, em ordem, " +
-    "de forma direta e acionável. Em pontosFortes, cite elementos concretos da letra, nunca elogios vagos.",
+    "pessoa do plural \"nós\"), fluidez e prosódia. Liste em correcoes no máximo 6 problemas, priorizando " +
+    "os mais importantes e graves — nunca mais que 6, mesmo que existam mais. Para CADA correção, cite o " +
+    "trecho original exato (trechoOriginal), classifique o tipo e a gravidade, explique especificamente " +
+    "por que está incorreto ou confuso em 1-2 frases curtas (nunca uma explicação vaga como \"pode " +
+    "melhorar a fluidez\" ou \"a concordância precisa ser revista\"), e ofereça duas reescritas " +
+    "alternativas curtas (opcao1, opcao2), indicando em observacaoDeSentido, em poucas palavras, se as " +
+    "alternativas mudam o sentido original. Liste em problemasDeConsistencia qualquer alternância não " +
+    "intencional entre primeira pessoa do singular e do plural, ou outras inconsistências narrativas. Em " +
+    "prioridades, liste no máximo 5 correções mais importantes, em ordem, de forma direta e acionável. Em " +
+    "pontosFortes, cite elementos concretos da letra, nunca elogios vagos.",
   composicao:
     "Analise a composição: estrutura, classificação lírica, emoção predominante, energia textual, tema " +
     "central, observações de produção, pontos fortes e sugestões. Nos pontos fortes, cite elementos " +
@@ -339,8 +408,26 @@ const AREA_FOCUS: Record<Area, string> = {
     "linguagem acessível) — nunca elogios genéricos. Nunca classifique a canção como \"autoajuda\"; " +
     "prefira testemunho, redenção, restauração, esperança em Deus, gratidão, confiança ou adoração.",
   congregacional:
-    "Avalie o uso congregacional: adequação, facilidade de canto, clareza da mensagem, pontos fortes e " +
-    "sugestões.",
+    "Avalie o uso congregacional em frases curtas e objetivas (no máximo 2 frases por campo): adequação, " +
+    "facilidade de canto, clareza da mensagem, pontos fortes e sugestões.",
+};
+
+// The português and congregacional schemas ask for the most string-heavy
+// content (an array of rich correction objects, or several free-text
+// evaluation fields) — the two areas most likely to run out of the retry's
+// smaller token budget before finishing the JSON object. Their retry prompt
+// asks for noticeably less than the primary attempt, on top of the generic
+// "Seja breve." every other area gets, specifically to avoid a truncated
+// (and therefore fully discarded) response on the very attempt that already
+// has the least room to work with.
+const AREA_FOCUS_RETRY_OVERRIDES: Partial<Record<Area, string>> = {
+  portugues:
+    "Revise a letra em português, de forma extremamente concisa. Liste em correcoes no máximo 3 " +
+    "problemas mais importantes: trecho original, tipo, gravidade, uma explicação objetiva em 1 frase, e " +
+    "duas opções de reescrita curtas. Nunca explicações vagas.",
+  congregacional:
+    "Avalie o uso congregacional de forma extremamente concisa: 1 frase por campo (adequação, facilidade " +
+    "de canto, clareza da mensagem), no máximo 2 pontos fortes e 2 sugestões.",
 };
 
 export function areaUserPayload(area: Area, _request: AnalyzeRequest, sections: SongSection[]): string {
@@ -352,7 +439,8 @@ ${formatSections(sections)}
 }
 
 export function areaRetryUserPayload(area: Area, sections: SongSection[]): string {
-  return `${AREA_FOCUS[area]} Seja breve.
+  const focus = AREA_FOCUS_RETRY_OVERRIDES[area] ?? `${AREA_FOCUS[area]} Seja breve.`;
+  return `${focus}
 
 <letra_do_usuario>
 ${formatSections(sections)}
@@ -499,6 +587,22 @@ function isVagueExplanation(explicacao: string): boolean {
   return VAGUE_EXPLANATION_PHRASES.some((phrase) => normalized.includes(phrase));
 }
 
+// A model sometimes echoes the category label itself ("Temática", "Alusão",
+// "Direta") back as if it were the actual relação-com-a-letra explanation —
+// that reads to the user as a fabricated excerpt/explanation, since it isn't
+// real content from the lyrics at all. Treated the same as no explanation.
+const BIBLICAL_RELATION_LABEL_ECHOES = new Set(["direta", "alusao", "tematica", "citacao direta"]);
+
+function isVagueBiblicalRelation(relacao: string): boolean {
+  const normalized = relacao
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (normalized.length < 15) return true;
+  return BIBLICAL_RELATION_LABEL_ECHOES.has(normalized);
+}
+
 // This lyric (and others like it) is a testimony/redemption song, not
 // self-help — if a model ever mislabels it that way, correct it rather
 // than surface the label as-is.
@@ -532,9 +636,10 @@ function mapBiblicalReferences(
     .filter((item) => item.referencia && item.referencia.trim().length > 0)
     .map((item, i) => {
       const parsed = parseReferenceLabel(item.referencia);
+      const hasUsableRelation = Boolean(item.relacaoComALetra) && !isVagueBiblicalRelation(item.relacaoComALetra);
       return {
         id: `ai-ref-${i}-${slugify(item.referencia)}`,
-        excerptFromLyrics: item.relacaoComALetra || item.referencia,
+        excerptFromLyrics: hasUsableRelation ? item.relacaoComALetra : item.referencia,
         referenceLabel: item.referencia.trim(),
         book: parsed?.book ?? item.referencia.trim(),
         chapterStart: parsed?.chapterStart ?? 1,
@@ -543,7 +648,9 @@ function mapBiblicalReferences(
         verseEnd: parsed?.verseEnd,
         relationType: mapTipoToRelationType(item.tipo),
         proximity: proximityForTipo(item.tipo),
-        explanation: item.relacaoComALetra || "Relação identificada pela análise.",
+        explanation: hasUsableRelation
+          ? item.relacaoComALetra
+          : "A análise identificou esta referência, mas não forneceu uma explicação detalhada da relação com a letra nesta tentativa.",
         confidence: confidenceForTipo(item.tipo),
         translationUsed: request.bibleTranslationPreference,
         verseTextAvailable: false,

@@ -46,7 +46,7 @@ const AREA_MAX_TOKENS_INDIVIDUAL = 650;
 const AREA_RETRY_MAX_TOKENS = 350;
 
 const PORTUGUES_TEMPERATURE = 0.1;
-const PORTUGUES_MAX_TOKENS = 750;
+const PORTUGUES_MAX_TOKENS = 800;
 const PORTUGUES_RETRY_MAX_TOKENS = 450;
 
 const TIMEOUT_MESSAGE = "Esta parte da análise demorou mais que o esperado. Tente novamente.";
