@@ -1,6 +1,11 @@
 import { AnalysisResultSchema, type AnalyzeRequest } from "@verbo/shared";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runAnalysis } from "./analysisService.js";
+
+const runLanguageToolCheckMock = vi.fn().mockResolvedValue([]);
+vi.mock("./grammar/languageTool.js", () => ({
+  runLanguageToolCheck: (...args: unknown[]) => runLanguageToolCheckMock(...args),
+}));
 
 function request(overrides: Partial<AnalyzeRequest> = {}): AnalyzeRequest {
   return {
@@ -53,5 +58,50 @@ describe("runAnalysis (demo mode, no AI binding available)", () => {
       undefined
     );
     expect(result.bibleReferences.some((r) => r.referenceLabel === "Salmos 126:5")).toBe(true);
+  });
+});
+
+describe("runAnalysis — LanguageTool findings", () => {
+  it("adds a LanguageTool finding whose excerpt doesn't overlap with an existing one", async () => {
+    runLanguageToolCheckMock.mockResolvedValueOnce([
+      {
+        id: "lt-test-1",
+        originalExcerpt: "um trecho totalmente único",
+        type: "concordancia_verbal",
+        explanation: "Explicação detalhada do LanguageTool.",
+        possibleCorrection: "correção sugerida",
+        poeticLicensePossible: false,
+        classification: "erro_provavel",
+        source: "languagetool",
+      },
+    ]);
+
+    const { result } = await runAnalysis(request(), undefined);
+    expect(result.grammarFindings.some((f) => f.source === "languagetool")).toBe(true);
+  });
+
+  it("skips a LanguageTool finding that duplicates an excerpt already flagged deterministically", async () => {
+    // The fixture lyrics contain a double space ("escuros  buscando"), which
+    // runDeterministicChecks always flags with originalExcerpt "s  b".
+    runLanguageToolCheckMock.mockResolvedValueOnce([
+      {
+        id: "lt-test-2",
+        originalExcerpt: "s  b",
+        type: "pontuacao",
+        explanation: "Duplicata do achado determinístico.",
+        poeticLicensePossible: false,
+        classification: "erro_provavel",
+        source: "languagetool",
+      },
+    ]);
+
+    const { result } = await runAnalysis(request(), undefined);
+    expect(result.grammarFindings.filter((f) => f.source === "languagetool")).toHaveLength(0);
+  });
+
+  it("never drops the deterministic/AI findings even when LanguageTool itself fails", async () => {
+    runLanguageToolCheckMock.mockRejectedValueOnce(new Error("languagetool unavailable"));
+    const { result } = await runAnalysis(request(), undefined);
+    expect(result.grammarFindings.some((f) => f.source === "deterministico")).toBe(true);
   });
 });

@@ -1,5 +1,10 @@
 import type { BibleLookupResponse, BibleReference } from "@verbo/shared";
+import { fetchExternalVerse } from "./abibliadigital.js";
 import { BIBLE_DATASET_DISCLAIMER, CURATED_VERSES, type CuratedVerse } from "./dataset.js";
+
+const EXTERNAL_ATTRIBUTION =
+  "Texto obtido via abibliadigital.com.br (tradução Almeida Corrigida Fiel, domínio público). " +
+  "Confirme a citação exata em uma Bíblia impressa ou aplicativo oficial antes de publicar ou citar formalmente.";
 
 function normalize(text: string): string {
   return text
@@ -112,27 +117,47 @@ export function detectCuratedAllusions(lyrics: string): BibleReference[] {
 /**
  * The AI is instructed never to output verse text, but this is the actual
  * safety net: whatever the model claims about `verseText`/`verseTextAvailable`
- * is discarded and replaced by a real lookup against the curated dataset.
- * A reference the model identified but that isn't in the dataset always ends
- * up with verseTextAvailable=false — never a fabricated quote.
+ * is discarded and replaced by a real lookup — first against the small
+ * curated dataset, then (only if not found there, and only when a token is
+ * configured) against the abibliadigital.com.br free API using the
+ * reference's own book/chapter/verse fields. A reference that isn't found in
+ * either source always ends up with verseTextAvailable=false — never a
+ * fabricated quote.
  */
-export function enrichBibleReferences(references: BibleReference[]): BibleReference[] {
-  return references.map((ref) => {
-    const lookup = lookupVerse(ref.referenceLabel);
-    if (lookup.found) {
+export async function enrichBibleReferences(
+  references: BibleReference[],
+  abibliadigitalToken?: string
+): Promise<BibleReference[]> {
+  return Promise.all(
+    references.map(async (ref) => {
+      const curated = lookupVerse(ref.referenceLabel);
+      if (curated.found) {
+        return {
+          ...ref,
+          verseText: curated.text,
+          verseTextAvailable: true,
+          translationUsed: curated.translation ?? ref.translationUsed,
+          attribution: curated.attribution,
+        };
+      }
+
+      const external = await fetchExternalVerse(ref.book, ref.chapterStart, ref.verseStart, abibliadigitalToken);
+      if (external) {
+        return {
+          ...ref,
+          verseText: external.text,
+          verseTextAvailable: true,
+          translationUsed: `abibliadigital.com.br (${external.version.toUpperCase()})`,
+          attribution: EXTERNAL_ATTRIBUTION,
+        };
+      }
+
       return {
         ...ref,
-        verseText: lookup.text,
-        verseTextAvailable: true,
-        translationUsed: lookup.translation ?? ref.translationUsed,
-        attribution: lookup.attribution,
+        verseText: undefined,
+        verseTextAvailable: false,
+        attribution: undefined,
       };
-    }
-    return {
-      ...ref,
-      verseText: undefined,
-      verseTextAvailable: false,
-      attribution: undefined,
-    };
-  });
+    })
+  );
 }

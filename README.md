@@ -218,6 +218,33 @@ Settings → Environment variables do projeto Pages:
 Nenhuma chave de API de IA é necessária em nenhum lugar — o binding `AI` do `wrangler.jsonc`
 provê acesso ao Workers AI diretamente, sem secret. Não há `ANTHROPIC_API_KEY` nesta versão.
 
+## Integrações externas opcionais (gratuitas)
+
+Duas checagens adicionais, independentes da IA, complementam a análise. Ambas são
+**best-effort e falham de forma segura**: se a chamada externa demorar, der erro ou estiver
+indisponível, a análise continua normalmente com o restante dos resultados — nunca é motivo de
+falha da requisição.
+
+**LanguageTool** (revisão gramatical determinística em português) — chama a API pública
+gratuita `api.languagetoolplus.com` (sem chave, sujeita a limite de requisições da própria
+LanguageTool) para uma checagem de concordância/ortografia/pontuação real, complementar à
+revisão de português feita pela IA. Não requer nenhuma configuração: funciona assim que o Worker
+é publicado. Achados desse serviço aparecem no relatório com a etiqueta "checagem LanguageTool"
+e nunca duplicam um achado já identificado pela checagem determinística ou pela IA.
+
+**abibliadigital.com.br** (texto integral de versículos) — usado apenas como fallback quando uma
+referência bíblica identificada não está no pequeno conjunto curado deste app. Requer um token
+gratuito (crie uma conta em abibliadigital.com.br) configurado como **secret** do Worker:
+
+```bash
+cd worker
+npx wrangler secret put ABIBLIADIGITAL_TOKEN
+```
+
+Sem esse secret configurado, o comportamento é idêntico ao anterior: referências fora do
+conjunto curado continuam mostrando apenas a referência + explicação da IA, sem texto de
+versículo — nunca um texto inventado.
+
 ## Funcionamento offline
 
 O Firestore mantém cache local (IndexedDB) no navegador. Com isso, o usuário consegue visualizar

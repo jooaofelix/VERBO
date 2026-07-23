@@ -12,6 +12,8 @@ export interface Env {
   AI?: Ai;
   FIREBASE_PROJECT_ID: string;
   ALLOWED_ORIGIN: string;
+  /** Optional free API token for abibliadigital.com.br (register at the site to get one). Verse lookups outside the curated dataset simply stay unavailable when this isn't set. */
+  ABIBLIADIGITAL_TOKEN?: string;
 }
 
 function corsHeaders(origin: string): HeadersInit {
@@ -53,7 +55,7 @@ async function handleAnalyze(request: Request, env: Env, origin: string): Promis
 
   console.log("analyze request", { uid, ...summarizeForLog(body) });
 
-  const { mode, result } = await runAnalysis(body, env.AI);
+  const { mode, result } = await runAnalysis(body, env.AI, env.ABIBLIADIGITAL_TOKEN);
   return json({ mode, result }, 200, origin);
 }
 

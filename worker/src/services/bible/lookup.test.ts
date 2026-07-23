@@ -1,6 +1,10 @@
 import type { BibleReference } from "@verbo/shared";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { detectCuratedAllusions, enrichBibleReferences, lookupVerse } from "./lookup.js";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function ref(overrides: Partial<BibleReference>): BibleReference {
   return {
@@ -84,16 +88,52 @@ describe("detectCuratedAllusions", () => {
 });
 
 describe("enrichBibleReferences", () => {
-  it("fills in real verse text for a reference the AI identified correctly", () => {
-    const [enriched] = enrichBibleReferences([ref({ referenceLabel: "João 3:16" })]);
+  it("fills in real verse text for a reference the AI identified correctly", async () => {
+    const [enriched] = await enrichBibleReferences([ref({ referenceLabel: "João 3:16" })]);
     expect(enriched.verseTextAvailable).toBe(true);
     expect(enriched.verseText).toContain("amou o mundo");
   });
 
-  it("discards any AI-supplied verse text for references outside the curated dataset", () => {
-    const [enriched] = enrichBibleReferences([
+  it("discards any AI-supplied verse text for a reference outside both the curated dataset and abibliadigital (no token configured)", async () => {
+    const [enriched] = await enrichBibleReferences([
       ref({ referenceLabel: "Levítico 19:34", verseText: "texto inventado pela IA", verseTextAvailable: true }),
     ]);
+    expect(enriched.verseTextAvailable).toBe(false);
+    expect(enriched.verseText).toBeUndefined();
+  });
+
+  it("falls back to abibliadigital for a reference outside the curated dataset when a token is configured", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ text: "Amarás o teu próximo como a ti mesmo." }),
+      }))
+    );
+
+    const [enriched] = await enrichBibleReferences(
+      [ref({ referenceLabel: "Levítico 19:34", book: "Levítico", chapterStart: 19, verseStart: 34 })],
+      "fake-token"
+    );
+
+    expect(enriched.verseTextAvailable).toBe(true);
+    expect(enriched.verseText).toBe("Amarás o teu próximo como a ti mesmo.");
+    expect(enriched.translationUsed).toContain("abibliadigital.com.br");
+    expect(enriched.attribution).toMatch(/abibliadigital/i);
+  });
+
+  it("still reports verseTextAvailable=false when abibliadigital itself fails, even with a token configured", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) }))
+    );
+
+    const [enriched] = await enrichBibleReferences(
+      [ref({ referenceLabel: "Levítico 19:34", book: "Levítico", chapterStart: 19, verseStart: 34 })],
+      "fake-token"
+    );
+
     expect(enriched.verseTextAvailable).toBe(false);
     expect(enriched.verseText).toBeUndefined();
   });

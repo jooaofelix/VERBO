@@ -67,6 +67,11 @@ function GrammarFindingRow({ finding }: { finding: GrammarFinding }) {
             checagem automática
           </span>
         )}
+        {finding.source === "languagetool" && (
+          <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-xs text-sky-700 dark:text-sky-400">
+            checagem LanguageTool
+          </span>
+        )}
       </div>
       <blockquote className="mt-1.5 border-l-2 border-rose-500/30 pl-2 italic">
         "{finding.originalExcerpt}"

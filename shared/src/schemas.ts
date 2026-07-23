@@ -228,7 +228,7 @@ export const GrammarFindingSchema = z.object({
   metricImpact: z.string().optional(),
   poeticLicensePossible: z.boolean(),
   classification: GrammarClassificationSchema,
-  source: z.enum(["deterministico", "ia"]).default("ia"),
+  source: z.enum(["deterministico", "ia", "languagetool"]).default("ia"),
 });
 
 export const CompositionAspectSchema = z.enum([
