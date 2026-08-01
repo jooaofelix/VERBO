@@ -1,6 +1,13 @@
-import type { AnalyzeRequest } from "@verbo/shared";
+import type { AnalyzeRequest, SongSection } from "@verbo/shared";
 import { describe, expect, it } from "vitest";
-import { extractJson, mergeAreasIntoAnalysis, type AreaShapes, type BiblicalAIShape } from "./areas.js";
+import {
+  areaUserPayload,
+  extractJson,
+  mergeAreasIntoAnalysis,
+  type AreaShapes,
+  type BiblicalAIShape,
+  type PortuguesAIShape,
+} from "./areas.js";
 
 function baseRequest(): AnalyzeRequest {
   return {
@@ -146,5 +153,123 @@ describe("mergeAreasIntoAnalysis — biblical reference relation text", () => {
 
     const [ref] = mergeAreasIntoAnalysis(baseRequest(), shapes).bibleReferences;
     expect(ref.excerptFromLyrics).toBe("Salmos 23:4");
+  });
+
+  it("also falls back to the reference label for a short fragment that isn't a real category echo but still isn't a real sentence", () => {
+    const shapes: AreaShapes = {
+      biblica_teologica: biblicalShape({
+        referenciasBiblicas: [{ referencia: "Salmos 23:4", relacaoComALetra: "Fala de Deus.", tipo: "tematica" }],
+      }),
+    };
+
+    const [ref] = mergeAreasIntoAnalysis(baseRequest(), shapes).bibleReferences;
+    expect(ref.excerptFromLyrics).toBe("Salmos 23:4");
+  });
+
+  it("keeps a genuinely detailed relação even when it doesn't literally match a known category-echo string", () => {
+    const shapes: AreaShapes = {
+      biblica_teologica: biblicalShape({
+        referenciasBiblicas: [
+          {
+            referencia: "Salmos 23:4",
+            relacaoComALetra:
+              "A imagem de 'caminhar por vales escuros sem temer' remete diretamente à confiança descrita neste salmo.",
+            tipo: "alusao",
+          },
+        ],
+      }),
+    };
+
+    const [ref] = mergeAreasIntoAnalysis(baseRequest(), shapes).bibleReferences;
+    expect(ref.explanation).toContain("caminhar por vales escuros");
+  });
+});
+
+function portuguesShape(overrides: Partial<PortuguesAIShape> = {}): PortuguesAIShape {
+  return {
+    resumo: "",
+    correcoes: [],
+    problemasDeConsistencia: [],
+    pontosFortes: [],
+    prioridades: [],
+    ...overrides,
+  };
+}
+
+describe("mergeAreasIntoAnalysis — grammar explanation depth", () => {
+  it("drops a correção whose explicação is just a short generic fragment, not a real sentence", () => {
+    const shapes: AreaShapes = {
+      portugues: portuguesShape({
+        correcoes: [
+          {
+            trechoOriginal: "nós vai",
+            tipo: "concordancia",
+            gravidade: "alta",
+            explicacao: "Erro de concordância.",
+            opcao1: "nós vamos",
+            opcao2: "",
+            observacaoDeSentido: "",
+          },
+        ],
+      }),
+    };
+
+    const result = mergeAreasIntoAnalysis(baseRequest(), shapes);
+    expect(result.grammarFindings.some((f) => f.originalExcerpt === "nós vai")).toBe(false);
+  });
+
+  it("keeps a correção with a real, specific two-sentence explanation", () => {
+    const shapes: AreaShapes = {
+      portugues: portuguesShape({
+        correcoes: [
+          {
+            trechoOriginal: "nós vai",
+            tipo: "concordancia",
+            gravidade: "alta",
+            explicacao:
+              "O verbo \"vai\" está conjugado na terceira pessoa do singular, mas o sujeito \"nós\" exige a " +
+              "primeira pessoa do plural.",
+            opcao1: "nós vamos",
+            opcao2: "",
+            observacaoDeSentido: "",
+          },
+        ],
+      }),
+    };
+
+    const result = mergeAreasIntoAnalysis(baseRequest(), shapes);
+    expect(result.grammarFindings.some((f) => f.originalExcerpt === "nós vai")).toBe(true);
+  });
+});
+
+describe("areaUserPayload — Gemini gets a richer, higher-capacity prompt", () => {
+  const sections: SongSection[] = [
+    { id: "sec-1", type: "verso", index: 1, label: "Verso 1", text: "Tu és fiel", startLine: 0, endLine: 0 },
+  ];
+
+  it("uses the terse default focus for português by default", () => {
+    const payload = areaUserPayload("portugues", baseRequest(), sections);
+    expect(payload).toContain("no máximo 6 problemas");
+  });
+
+  it("uses a richer, higher-cap focus for português when the 'gemini' variant is requested", () => {
+    const payload = areaUserPayload("portugues", baseRequest(), sections, "gemini");
+    expect(payload).toContain("até 10 problemas reais");
+    expect(payload).toContain("pelo menos duas frases específicas");
+  });
+
+  it("asks Gemini for 2-3 biblical references with a two-part explanation, unlike the default focus", () => {
+    const defaultPayload = areaUserPayload("biblica_teologica", baseRequest(), sections);
+    const geminiPayload = areaUserPayload("biblica_teologica", baseRequest(), sections, "gemini");
+
+    expect(defaultPayload).not.toContain("2 ou 3 referências");
+    expect(geminiPayload).toContain("2 ou 3 referências");
+    expect(geminiPayload).toContain("pelo menos duas frases específicas");
+  });
+
+  it("falls back to the default focus for areas without a Gemini-specific override (e.g. composicao)", () => {
+    const defaultPayload = areaUserPayload("composicao", baseRequest(), sections);
+    const geminiPayload = areaUserPayload("composicao", baseRequest(), sections, "gemini");
+    expect(geminiPayload).toBe(defaultPayload);
   });
 });

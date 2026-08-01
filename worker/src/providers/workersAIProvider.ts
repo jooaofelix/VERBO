@@ -57,6 +57,15 @@ const PORTUGUES_RETRY_MAX_TOKENS = 450;
 // binding — Gemini is additive, never a hard dependency.
 const GEMINI_AREAS: ReadonlySet<Area> = new Set(["portugues", "biblica_teologica"]);
 
+// Gemini isn't constrained by Cloudflare's per-request neuron/timeout
+// budget, so its primary attempt can afford noticeably more room than the
+// Workers AI budgets above — paired with the richer AREA_FOCUS_GEMINI
+// prompts (more corrections, more references, longer explanations).
+const GEMINI_MAX_TOKENS: Partial<Record<Area, number>> = {
+  portugues: 1400,
+  biblica_teologica: 900,
+};
+
 const TIMEOUT_MESSAGE = "Esta parte da análise demorou mais que o esperado. Tente novamente.";
 const FORMAT_INVALID_MESSAGE = "A resposta desta seção não pôde ser processada.";
 const GENERIC_UNAVAILABLE_MESSAGE = "Não foi possível concluir esta parte da análise agora. Tente novamente.";
@@ -200,16 +209,17 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     const primaryModel = isPortugues ? MODEL_PORTUGUES : MODEL_DEFAULT;
     const primaryTemperature = isPortugues ? PORTUGUES_TEMPERATURE : AREA_TEMPERATURE;
     const primaryMaxTokens = isPortugues ? PORTUGUES_MAX_TOKENS : maxTokens;
-    const primaryMessages: ChatMessage[] = [
-      { role: "system", content: AREA_SYSTEM_PROMPT },
-      { role: "user", content: areaUserPayload(area, request, sections) },
-    ];
 
     const usesGemini = Boolean(this.geminiApiKey) && GEMINI_AREAS.has(area);
+    const primaryMessages: ChatMessage[] = [
+      { role: "system", content: AREA_SYSTEM_PROMPT },
+      { role: "user", content: areaUserPayload(area, request, sections, usesGemini ? "gemini" : "padrao") },
+    ];
+    const geminiMaxTokens = GEMINI_MAX_TOKENS[area] ?? primaryMaxTokens;
 
     console.log("analyze section start", { area, attempt: 1, model: usesGemini ? GEMINI_MODEL : primaryModel });
     const first = usesGemini
-      ? await this.attemptAreaWithGemini(area, primaryMessages, primaryMaxTokens, primaryTemperature)
+      ? await this.attemptAreaWithGemini(area, primaryMessages, geminiMaxTokens, primaryTemperature)
       : await this.attemptArea(area, primaryMessages, primaryMaxTokens, primaryModel, primaryTemperature);
     if (first.kind === "ok") {
       console.log("analyze section success", { area, attempt: 1 });

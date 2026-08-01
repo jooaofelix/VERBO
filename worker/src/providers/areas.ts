@@ -430,8 +430,49 @@ const AREA_FOCUS_RETRY_OVERRIDES: Partial<Record<Area, string>> = {
     "de canto, clareza da mensagem), no máximo 2 pontos fortes e 2 sugestões.",
 };
 
-export function areaUserPayload(area: Area, _request: AnalyzeRequest, sections: SongSection[]): string {
-  return `${AREA_FOCUS[area]}
+// Gemini isn't bound by Cloudflare's per-request neuron/timeout budget the
+// way the free Workers AI model is, so when it's the one answering, it can
+// afford to be asked for meaningfully more: more corrections, more
+// references, longer per-item explanations. Used only for the primary
+// Gemini attempt on "portugues" and "biblica_teologica" — the Workers AI
+// retry (if Gemini fails) always falls back to the terser AREA_FOCUS above,
+// which is calibrated for that smaller model's real capacity.
+const AREA_FOCUS_GEMINI_OVERRIDES: Partial<Record<Area, string>> = {
+  portugues:
+    "Revise a letra em português palavra por palavra e frase por frase, com profundidade real: ortografia, " +
+    "concordância verbal e nominal, regência, pontuação, clareza, coerência, consistência de pessoa verbal " +
+    "(1ª pessoa \"eu\" vs. 1ª pessoa do plural \"nós\"), fluidez e prosódia. Liste em correcoes até 10 " +
+    "problemas reais — não invente problemas que não existem, mas também não deixe de citar um problema " +
+    "real só para ser breve. Para CADA correção, cite o trecho original exato (trechoOriginal), classifique " +
+    "o tipo e a gravidade, e explique em pelo menos duas frases específicas por que está incorreto ou " +
+    "confuso — nunca uma frase genérica de uma linha como \"pode melhorar a fluidez\" ou \"a concordância " +
+    "precisa ser revista\". Ofereça duas reescritas alternativas reais (opcao1, opcao2) que preservem o " +
+    "estilo da letra, indicando em observacaoDeSentido, com uma frase, se mudam o sentido original. Liste " +
+    "em problemasDeConsistencia toda alternância não intencional entre primeira pessoa do singular e do " +
+    "plural, citando os trechos onde ocorre. Em prioridades, liste no máximo 5 correções mais importantes, " +
+    "em ordem, de forma direta e acionável. Em pontosFortes, cite elementos concretos da letra (imagens, " +
+    "repetições, progressão emocional), nunca elogios vagos.",
+  biblica_teologica:
+    "Identifique referências bíblicas prováveis (ex.: \"Salmos 23:1\"). Se a letra permitir, identifique " +
+    "2 ou 3 referências distintas, não apenas uma. Para CADA referência, classifique o tipo (direta, " +
+    "alusão ou temática) e escreva em relacaoComALetra pelo menos duas frases específicas: (1) qual trecho " +
+    "ou imagem exata da letra remete a essa passagem, citando palavras da própria letra, e (2) por que essa " +
+    "conexão faz sentido teologicamente — nunca uma resposta de uma palavra só, como \"temática\" ou " +
+    "\"alusão\". Nunca escreva o texto do versículo, apenas a referência. Acrescente observações " +
+    "teológicas específicas (nunca genéricas) e pontos fortes citando elementos concretos da letra (uma " +
+    "frase-eixo repetida, uma alusão bíblica específica, uma declaração sobre o caráter de Deus) — nunca " +
+    "elogios genéricos. Classifique o gênero da canção como testemunho, redenção, restauração, esperança " +
+    "em Deus, gratidão, confiança ou adoração; nunca como \"autoajuda\".",
+};
+
+export function areaUserPayload(
+  area: Area,
+  _request: AnalyzeRequest,
+  sections: SongSection[],
+  variant: "padrao" | "gemini" = "padrao"
+): string {
+  const focus = variant === "gemini" ? (AREA_FOCUS_GEMINI_OVERRIDES[area] ?? AREA_FOCUS[area]) : AREA_FOCUS[area];
+  return `${focus}
 
 <letra_do_usuario>
 ${formatSections(sections)}
@@ -581,9 +622,16 @@ function confidenceForTipo(tipo: string | undefined): ConfidenceLevel {
 // concrete to act on.
 const VAGUE_EXPLANATION_PHRASES = ["pode melhorar", "precisa ser revist", "pode ficar mais clar"];
 
+function wordCountOf(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
 function isVagueExplanation(explicacao: string): boolean {
   const normalized = explicacao.trim().toLowerCase();
-  if (normalized.length < 15) return true;
+  // A real explanation names what's wrong and why — a real sentence, not a
+  // fragment. Both checks matter: a handful of long words isn't detailed
+  // enough, and a long run of short filler words isn't either.
+  if (normalized.length < 25 || wordCountOf(normalized) < 5) return true;
   return VAGUE_EXPLANATION_PHRASES.some((phrase) => normalized.includes(phrase));
 }
 
@@ -594,13 +642,15 @@ function isVagueExplanation(explicacao: string): boolean {
 const BIBLICAL_RELATION_LABEL_ECHOES = new Set(["direta", "alusao", "tematica", "citacao direta"]);
 
 function isVagueBiblicalRelation(relacao: string): boolean {
-  const normalized = relacao
-    .trim()
+  const trimmed = relacao.trim();
+  const normalized = trimmed
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
-  if (normalized.length < 15) return true;
-  return BIBLICAL_RELATION_LABEL_ECHOES.has(normalized);
+  if (BIBLICAL_RELATION_LABEL_ECHOES.has(normalized)) return true;
+  // A real rela\u00e7\u00e3o-com-a-letra explains, in at least a short sentence, what
+  // in the lyric connects to the passage \u2014 not just a label or a fragment.
+  return trimmed.length < 25 || wordCountOf(trimmed) < 5;
 }
 
 // This lyric (and others like it) is a testimony/redemption song, not
