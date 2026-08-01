@@ -72,6 +72,25 @@ export function listAvailableReferences(): string[] {
 }
 
 /**
+ * A reference like "Salmos 23:4" won't exact-match a curated "Salmos
+ * 23:1-4" entry by label/alias, even though verse 4 is literally inside
+ * that curated range — this checks book + chapter + whether the cited
+ * verse falls within the curated range, so a slightly different verse
+ * number the AI cites still surfaces the real text instead of "não
+ * disponível" for a passage we already have.
+ */
+function findCuratedByRange(book: string, chapterStart: number, verseStart: number): CuratedVerse | null {
+  const normalizedBook = normalize(book);
+  for (const verse of CURATED_VERSES) {
+    if (normalize(verse.book) !== normalizedBook) continue;
+    if (verse.chapterStart !== chapterStart) continue;
+    const rangeEnd = verse.verseEnd ?? verse.verseStart;
+    if (verseStart >= verse.verseStart && verseStart <= rangeEnd) return verse;
+  }
+  return null;
+}
+
+/**
  * Scans the raw lyrics for a small set of curated, very-well-known
  * allusion phrasings (e.g. "os que semeiam com lágrimas colherão com
  * alegria" → Salmos 126:5) and returns a BibleReference for each match —
@@ -139,6 +158,17 @@ export async function enrichBibleReferences(
           verseTextAvailable: true,
           translationUsed: curated.translation ?? ref.translationUsed,
           attribution: curated.attribution,
+        };
+      }
+
+      const curatedByRange = findCuratedByRange(ref.book, ref.chapterStart, ref.verseStart);
+      if (curatedByRange) {
+        return {
+          ...ref,
+          verseText: curatedByRange.text,
+          verseTextAvailable: true,
+          translationUsed: "Domínio público (base histórica Almeida)",
+          attribution: BIBLE_DATASET_DISCLAIMER,
         };
       }
 

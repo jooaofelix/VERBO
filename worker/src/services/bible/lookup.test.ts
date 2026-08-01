@@ -100,9 +100,24 @@ describe("enrichBibleReferences", () => {
     expect(enriched.verseText).toContain("amou o mundo");
   });
 
+  it("finds the curated text when the AI cites a specific verse that falls inside a curated range (e.g. Salmos 23:4 inside curated Salmos 23:1-4)", async () => {
+    const [enriched] = await enrichBibleReferences([
+      ref({ referenceLabel: "Salmos 23:4", book: "Salmos", chapterStart: 23, verseStart: 4 }),
+    ]);
+    expect(enriched.verseTextAvailable).toBe(true);
+    expect(enriched.verseText).toContain("O Senhor é o meu pastor");
+  });
+
   it("discards any AI-supplied verse text for a reference outside both the curated dataset and abibliadigital (no token configured)", async () => {
     const [enriched] = await enrichBibleReferences([
-      ref({ referenceLabel: "Levítico 19:34", verseText: "texto inventado pela IA", verseTextAvailable: true }),
+      ref({
+        referenceLabel: "Levítico 19:34",
+        book: "Levítico",
+        chapterStart: 19,
+        verseStart: 34,
+        verseText: "texto inventado pela IA",
+        verseTextAvailable: true,
+      }),
     ]);
     expect(enriched.verseTextAvailable).toBe(false);
     expect(enriched.verseText).toBeUndefined();
