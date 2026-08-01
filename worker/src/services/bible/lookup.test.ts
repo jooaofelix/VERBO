@@ -42,6 +42,12 @@ describe("lookupVerse", () => {
     expect(result.found).toBe(true);
   });
 
+  it("finds a verse via its singular 'salmo' alias even when queried with the plural 'Salmos' (common AI/user phrasing)", () => {
+    const result = lookupVerse("Salmos 23");
+    expect(result.found).toBe(true);
+    expect(result.text).toContain("O Senhor é o meu pastor");
+  });
+
   it("never fabricates text for a reference outside the curated dataset", () => {
     const result = lookupVerse("Levítico 19:34");
     expect(result.found).toBe(false);

@@ -13,7 +13,8 @@ function normalize(text: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\w\s:.-]/g, "")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    .replace(/\bsalmos\b/g, "salmo"); // "Salmos 23" (plural, common AI/user phrasing) must match a "salmo 23" alias.
 }
 
 const ALLUSION_INDEX: Array<{ verse: CuratedVerse; normalizedPhrases: string[] }> = CURATED_VERSES.filter(
