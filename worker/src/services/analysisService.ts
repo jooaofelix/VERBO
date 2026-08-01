@@ -81,7 +81,8 @@ function mergeGrammarFindings(base: GrammarFinding[], languageTool: GrammarFindi
 export async function runAnalysis(
   request: AnalyzeRequest,
   ai: Ai | undefined,
-  abibliadigitalToken?: string
+  abibliadigitalToken?: string,
+  geminiApiKey?: string
 ): Promise<{ mode: "live" | "demo"; result: AnalysisResult }> {
   const sections: SongSection[] =
     request.sections.length > 0 ? request.sections : suggestSections(request.lyrics);
@@ -89,7 +90,7 @@ export async function runAnalysis(
   const deterministicGrammar = runDeterministicChecks(sections);
   const prosody = analyzeProsody(sections);
 
-  const provider = getAIProvider(ai);
+  const provider = getAIProvider(ai, geminiApiKey);
   const [aiResult, languageToolFindings] = await Promise.all([
     provider.analyzeLyrics({ request, sections, deterministicGrammar, prosody }),
     runLanguageToolCheck(request.lyrics).catch(() => []),

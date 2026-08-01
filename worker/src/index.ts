@@ -14,6 +14,8 @@ export interface Env {
   ALLOWED_ORIGIN: string;
   /** Optional free API token for abibliadigital.com.br (register at the site to get one). Verse lookups outside the curated dataset simply stay unavailable when this isn't set. */
   ABIBLIADIGITAL_TOKEN?: string;
+  /** Optional Gemini API key (Google AI Studio). When set, used only for the "portugues" and "biblica_teologica" areas; every other area, and the retry if Gemini itself fails, stays on the free Workers AI binding. */
+  GEMINI_API_KEY?: string;
 }
 
 function corsHeaders(origin: string): HeadersInit {
@@ -55,7 +57,7 @@ async function handleAnalyze(request: Request, env: Env, origin: string): Promis
 
   console.log("analyze request", { uid, ...summarizeForLog(body) });
 
-  const { mode, result } = await runAnalysis(body, env.AI, env.ABIBLIADIGITAL_TOKEN);
+  const { mode, result } = await runAnalysis(body, env.AI, env.ABIBLIADIGITAL_TOKEN, env.GEMINI_API_KEY);
   return json({ mode, result }, 200, origin);
 }
 
@@ -73,7 +75,16 @@ async function handleSuggestSections(request: Request, env: Env, origin: string)
 }
 
 function handleHealth(env: Env, origin: string): Response {
-  return json({ ok: true, aiBindingAvailable: Boolean(env.AI) }, 200, origin);
+  return json(
+    {
+      ok: true,
+      aiBindingAvailable: Boolean(env.AI),
+      geminiConfigured: Boolean(env.GEMINI_API_KEY),
+      abibliadigitalConfigured: Boolean(env.ABIBLIADIGITAL_TOKEN),
+    },
+    200,
+    origin
+  );
 }
 
 export default {

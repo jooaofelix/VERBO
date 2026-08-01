@@ -9,8 +9,8 @@ import type { AIAnalysisProvider } from "./provider.js";
  * test, a misconfigured deploy) falls back to the demo provider instead of
  * throwing — the app stays usable end-to-end, just clearly labeled.
  */
-export function getAIProvider(ai: Ai | undefined): AIAnalysisProvider {
-  return ai ? new WorkersAIProvider(ai) : new DemoAIProvider();
+export function getAIProvider(ai: Ai | undefined, geminiApiKey?: string): AIAnalysisProvider {
+  return ai ? new WorkersAIProvider(ai, geminiApiKey) : new DemoAIProvider();
 }
 
 export type { AIAnalysisProvider, LyricsAnalysisInput } from "./provider.js";

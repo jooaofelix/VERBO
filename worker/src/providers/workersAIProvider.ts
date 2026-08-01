@@ -17,6 +17,7 @@ import {
   type AreaAIShape,
   type AreaShapes,
 } from "./areas.js";
+import { runGeminiCompletion, GEMINI_MODEL } from "./geminiClient.js";
 import type { AIAnalysisProvider, LyricsAnalysisInput } from "./provider.js";
 import {
   QUICK_JSON_SCHEMA,
@@ -48,6 +49,13 @@ const AREA_RETRY_MAX_TOKENS = 350;
 const PORTUGUES_TEMPERATURE = 0.1;
 const PORTUGUES_MAX_TOKENS = 800;
 const PORTUGUES_RETRY_MAX_TOKENS = 450;
+
+// When a Gemini API key is configured, these are the only two areas that
+// use it — exactly the ones the user asked to strengthen (revisão de
+// português e validação de referência bíblica). Every other area, and this
+// area's own retry if Gemini itself fails, stays on the free Workers AI
+// binding — Gemini is additive, never a hard dependency.
+const GEMINI_AREAS: ReadonlySet<Area> = new Set(["portugues", "biblica_teologica"]);
 
 const TIMEOUT_MESSAGE = "Esta parte da análise demorou mais que o esperado. Tente novamente.";
 const FORMAT_INVALID_MESSAGE = "A resposta desta seção não pôde ser processada.";
@@ -92,7 +100,10 @@ type AttemptOutcome =
 export class WorkersAIProvider implements AIAnalysisProvider {
   readonly mode = "live" as const;
 
-  constructor(private readonly ai: Ai) {}
+  constructor(
+    private readonly ai: Ai,
+    private readonly geminiApiKey?: string
+  ) {}
 
   async analyzeLyrics(input: LyricsAnalysisInput): Promise<AIProducedAnalysis> {
     if (input.request.revisionMode === "rapida") {
@@ -189,18 +200,17 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     const primaryModel = isPortugues ? MODEL_PORTUGUES : MODEL_DEFAULT;
     const primaryTemperature = isPortugues ? PORTUGUES_TEMPERATURE : AREA_TEMPERATURE;
     const primaryMaxTokens = isPortugues ? PORTUGUES_MAX_TOKENS : maxTokens;
+    const primaryMessages: ChatMessage[] = [
+      { role: "system", content: AREA_SYSTEM_PROMPT },
+      { role: "user", content: areaUserPayload(area, request, sections) },
+    ];
 
-    console.log("analyze section start", { area, attempt: 1, model: primaryModel });
-    const first = await this.attemptArea(
-      area,
-      [
-        { role: "system", content: AREA_SYSTEM_PROMPT },
-        { role: "user", content: areaUserPayload(area, request, sections) },
-      ],
-      primaryMaxTokens,
-      primaryModel,
-      primaryTemperature
-    );
+    const usesGemini = Boolean(this.geminiApiKey) && GEMINI_AREAS.has(area);
+
+    console.log("analyze section start", { area, attempt: 1, model: usesGemini ? GEMINI_MODEL : primaryModel });
+    const first = usesGemini
+      ? await this.attemptAreaWithGemini(area, primaryMessages, primaryMaxTokens, primaryTemperature)
+      : await this.attemptArea(area, primaryMessages, primaryMaxTokens, primaryModel, primaryTemperature);
     if (first.kind === "ok") {
       console.log("analyze section success", { area, attempt: 1 });
       return { status: "ok", data: first.data };
@@ -208,11 +218,10 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     console.log(logLabelFor(first.kind), { area, attempt: 1, kind: first.kind });
 
     // Exactly one retry, regardless of why the first attempt failed — never
-    // the same full call again, always the smaller prompt/budget below.
-    // "Português" always falls back to the 3B model on retry, even though
-    // its primary attempt uses the bigger one — that's what keeps this
-    // area from reintroducing the timeouts a bigger model everywhere used
-    // to cause.
+    // the same full call again, always the smaller prompt/budget below, and
+    // always on the free Workers AI binding (never Gemini again) — this is
+    // what keeps a failing/unconfigured Gemini key from ever costing the
+    // area an analysis it would otherwise have gotten from the 3B model.
     const retryModel = MODEL_DEFAULT;
     const retryTemperature = isPortugues ? PORTUGUES_TEMPERATURE : AREA_TEMPERATURE;
     const retryMaxTokens = isPortugues ? PORTUGUES_RETRY_MAX_TOKENS : AREA_RETRY_MAX_TOKENS;
@@ -252,10 +261,26 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     } catch (err) {
       return isTimeoutError(err) ? { kind: "timeout" } : { kind: "erro" };
     }
+    return this.processRawResponse(area, res.parsed ?? res.text);
+  }
 
+  /** Same contract as attemptArea(), but sources the completion from Gemini instead of the Workers AI binding. Never throws — a failed/unconfigured call is reported as "erro" so the caller falls back to the Workers AI retry. */
+  private async attemptAreaWithGemini(
+    area: Area,
+    messages: ChatMessage[],
+    maxTokens: number,
+    temperature: number
+  ): Promise<AttemptOutcome> {
+    if (!this.geminiApiKey) return { kind: "erro" };
+    const res = await runGeminiCompletion(this.geminiApiKey, messages, maxTokens, temperature, areaJsonSchema(area));
+    if (res === null) return { kind: "erro" };
+    return this.processRawResponse(area, res.text);
+  }
+
+  private processRawResponse(area: Area, raw: unknown): AttemptOutcome {
     let extracted: unknown;
     try {
-      extracted = extractJson(res.parsed ?? res.text);
+      extracted = extractJson(raw);
     } catch {
       return { kind: "formato_invalido" };
     }

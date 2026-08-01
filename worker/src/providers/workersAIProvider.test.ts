@@ -1,5 +1,5 @@
 import type { AnalyzeRequest, RevisionMode, SongSection } from "@verbo/shared";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ALL_AREAS as AREAS,
   areaJsonSchema,
@@ -725,6 +725,113 @@ describe("WorkersAIProvider — português: bigger model, isolated call, detaile
     });
 
     expect(result.topPriorities).toHaveLength(5);
+  });
+});
+
+function mockGeminiFetchOnce(jsonText: string) {
+  return vi.fn(async (_url: string, _init?: RequestInit) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ candidates: [{ content: { parts: [{ text: jsonText }] } }] }),
+  }));
+}
+
+describe("WorkersAIProvider — Gemini for português and biblica_teologica only", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("uses Gemini instead of Workers AI for the português primary attempt when a key is configured", async () => {
+    const fetchMock = mockGeminiFetchOnce(JSON.stringify(portuguesFixture()));
+    vi.stubGlobal("fetch", fetchMock);
+    const run = vi.fn();
+    const provider = new WorkersAIProvider({ run } as unknown as Ai, "fake-gemini-key");
+
+    const result = await provider.analyzeLyrics({
+      request: baseRequest("portugues"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("generativelanguage.googleapis.com");
+    expect(run).not.toHaveBeenCalled();
+    expect(result.grammarFindings.some((f) => f.originalExcerpt === "nós vai")).toBe(true);
+  });
+
+  it("uses Gemini for biblica_teologica when a key is configured", async () => {
+    const fetchMock = mockGeminiFetchOnce(JSON.stringify(biblicalFixture()));
+    vi.stubGlobal("fetch", fetchMock);
+    const run = vi.fn();
+    const provider = new WorkersAIProvider({ run } as unknown as Ai, "fake-gemini-key");
+
+    const result = await provider.analyzeLyrics({
+      request: baseRequest("biblica_teologica"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(run).not.toHaveBeenCalled();
+    expect(result.bibleReferences).toHaveLength(1);
+  });
+
+  it("never uses Gemini for composicao or congregacional, even when a key is configured", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const run = vi.fn().mockResolvedValue({ response: composicaoFixture() });
+    const provider = new WorkersAIProvider({ run } as unknown as Ai, "fake-gemini-key");
+
+    await provider.analyzeLyrics({
+      request: baseRequest("composicao"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the Workers AI retry (3B model) when Gemini fails, instead of failing the whole area", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) }))
+    );
+    const run = vi.fn().mockResolvedValue({ response: portuguesFixture() });
+    const provider = new WorkersAIProvider({ run } as unknown as Ai, "fake-gemini-key");
+
+    const result = await provider.analyzeLyrics({
+      request: baseRequest("portugues"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    expect(run).toHaveBeenCalledTimes(1);
+    const [model, options] = run.mock.calls[0] as [string, RunOptions];
+    expect(model).toBe("@cf/meta/llama-3.2-3b-instruct");
+    expect(options.max_tokens).toBe(450);
+    expect(result.sectionStatus).toEqual({});
+  });
+
+  it("behaves exactly as before (Workers AI only) when no Gemini key is configured", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const run = vi.fn().mockResolvedValue({ response: portuguesFixture() });
+    const provider = new WorkersAIProvider({ run } as unknown as Ai);
+
+    await provider.analyzeLyrics({
+      request: baseRequest("portugues"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledTimes(1);
   });
 });
 
