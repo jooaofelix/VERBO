@@ -331,6 +331,10 @@ const AREA_FOCUS: Record<Area, string> = {
     "uma pergunta retórica ou uma frase reescrita com outras palavras que comunique a mesma ideia de um " +
     "versículo conhecido (ex.: \"quem poderá nos separar de ti?\" ecoando Romanos 8:35/38-39) também é " +
     "uma alusão real e deve ser identificada pelo sentido, não pela semelhança literal das palavras. " +
+    "Só inclua uma referência quando você tiver confiança real de que ela é específica e verificável (um " +
+    "livro, capítulo e versículo reais e coerentes com o conteúdo da letra) — nunca invente ou force uma " +
+    "referência vaga só para preencher a lista; é preferível citar menos referências, todas corretas, do " +
+    "que incluir uma citação incerta ou genérica. " +
     "Nunca escreva o texto do versículo, apenas a referência. Acrescente observações teológicas e pontos " +
     "fortes citando elementos concretos da letra (uma frase-eixo repetida, uma alusão bíblica específica, " +
     "uma declaração sobre o caráter de Deus) — nunca elogios genéricos. Classifique o gênero da canção " +
@@ -395,7 +399,11 @@ const AREA_FOCUS_GEMINI_OVERRIDES: Partial<Record<Area, string>> = {
     "diretas quanto alusões pelo SENTIDO: uma pergunta retórica ou uma frase com outras palavras que " +
     "comunique a mesma ideia de um versículo conhecido também conta (ex.: \"quem poderá nos separar de " +
     "ti?\" ecoando Romanos 8:35/38-39, ou \"tu me sustentas\" ecoando Salmos 23) — nunca exija semelhança " +
-    "literal de palavras para reconhecer uma alusão real. Para CADA referência, classifique o tipo (direta, " +
+    "literal de palavras para reconhecer uma alusão real. Mesmo buscando 3 a 5 referências, NUNCA force uma " +
+    "citação vaga, genérica ou de baixa confiança apenas para atingir esse número — cada referência precisa " +
+    "de um livro, capítulo e versículo reais, específicos e coerentes com o trecho da letra; é sempre melhor " +
+    "citar 1 ou 2 referências realmente sólidas do que 5 onde algumas são incertas ou forçadas. Para CADA " +
+    "referência, classifique o tipo (direta, " +
     "alusão ou temática) e escreva em relacaoComALetra pelo menos duas frases específicas: (1) qual trecho " +
     "ou imagem exata da letra remete a essa passagem, citando palavras da própria letra, e (2) por que essa " +
     "conexão faz sentido teologicamente à luz do contexto histórico e literário da passagem, não apenas da " +
