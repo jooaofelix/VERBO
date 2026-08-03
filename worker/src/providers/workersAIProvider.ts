@@ -247,7 +247,10 @@ export class WorkersAIProvider implements AIAnalysisProvider {
       area,
       [
         { role: "system", content: AREA_SYSTEM_PROMPT_RETRY },
-        { role: "user", content: areaRetryUserPayload(area, sections) },
+        {
+          role: "user",
+          content: areaRetryUserPayload(area, sections, request.context.bibleReferencesProvidedByUser),
+        },
       ],
       retryMaxTokens,
       retryModel,

@@ -43,6 +43,8 @@ function biblicalFixture(): BiblicalAIShape {
     observacoesTeologicas: ["A letra reforça a fidelidade divina."],
     pontosFortes: ["Mensagem teológica clara."],
     alertas: [],
+    consistenciaComReferenciaDoUsuario: "nao_foi_possivel_determinar",
+    explicacaoConsistenciaReferencia: "",
   };
 }
 

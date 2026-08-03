@@ -1,6 +1,7 @@
 import type { AnalyzeRequest, SongSection } from "@verbo/shared";
 import { describe, expect, it } from "vitest";
 import {
+  areaRetryUserPayload,
   areaUserPayload,
   extractJson,
   mergeAreasIntoAnalysis,
@@ -9,14 +10,14 @@ import {
   type PortuguesAIShape,
 } from "./areas.js";
 
-function baseRequest(): AnalyzeRequest {
+function baseRequest(bibleReferencesProvidedByUser: string[] = []): AnalyzeRequest {
   return {
     lyrics: "Tu és fiel\n\nTu és fiel, tu és fiel",
     sections: [],
     context: {
       theologicalTradition: "nao_selecionar",
       desiredChangeLevel: "refinar_mantendo_voz",
-      bibleReferencesProvidedByUser: [],
+      bibleReferencesProvidedByUser,
     },
     revisionMode: "completa",
     bibleTranslationPreference: "dominio_publico_almeida",
@@ -30,6 +31,8 @@ function biblicalShape(overrides: Partial<BiblicalAIShape> = {}): BiblicalAIShap
     observacoesTeologicas: [],
     pontosFortes: [],
     alertas: [],
+    consistenciaComReferenciaDoUsuario: "nao_foi_possivel_determinar",
+    explicacaoConsistenciaReferencia: "",
     ...overrides,
   };
 }
@@ -277,5 +280,80 @@ describe("areaUserPayload — Gemini gets a richer, higher-capacity prompt", () 
     const geminiCongregacional = areaUserPayload("congregacional", baseRequest(), sections, "gemini");
     expect(geminiCongregacional).not.toBe(defaultCongregacional);
     expect(geminiCongregacional).toContain("pelo menos duas frases específicas");
+  });
+});
+
+describe("areaUserPayload / areaRetryUserPayload — user-provided base verse(s)", () => {
+  const sections: SongSection[] = [
+    { id: "sec-1", type: "verso", index: 1, label: "Verso 1", text: "Tu és fiel", startLine: 0, endLine: 0 },
+  ];
+
+  it("adds no consistency instructions when the composer provided no base reference", () => {
+    const payload = areaUserPayload("biblica_teologica", baseRequest([]), sections);
+    expect(payload).not.toContain("consistenciaComReferenciaDoUsuario");
+  });
+
+  it("does not add consistency instructions to unrelated areas even when references are provided", () => {
+    const payload = areaUserPayload("composicao", baseRequest(["João 3:16"]), sections);
+    expect(payload).not.toContain("consistenciaComReferenciaDoUsuario");
+  });
+
+  it("asks the AI to evaluate consistency against a single user-provided base verse", () => {
+    const payload = areaUserPayload("biblica_teologica", baseRequest(["João 3:16"]), sections);
+    expect(payload).toContain("João 3:16");
+    expect(payload).toContain("consistenciaComReferenciaDoUsuario");
+    expect(payload).toContain("contexto geral");
+  });
+
+  it("mentions all base verses and uses plural phrasing when more than one is provided", () => {
+    const payload = areaUserPayload("biblica_teologica", baseRequest(["João 3:16", "Salmos 23:1"]), sections);
+    expect(payload).toContain("João 3:16");
+    expect(payload).toContain("Salmos 23:1");
+    expect(payload).toContain("referências bíblicas base");
+  });
+
+  it("includes a concise version of the same instruction in the retry payload", () => {
+    const payload = areaRetryUserPayload("biblica_teologica", sections, ["João 3:16"]);
+    expect(payload).toContain("João 3:16");
+    expect(payload).toContain("consistenciaComReferenciaDoUsuario");
+  });
+
+  it("retry payload has no consistency instructions when no references were provided", () => {
+    const payload = areaRetryUserPayload("biblica_teologica", sections);
+    expect(payload).not.toContain("consistenciaComReferenciaDoUsuario");
+  });
+});
+
+describe("mergeAreasIntoAnalysis — consistency with user-provided base verse(s)", () => {
+  it("keeps the placeholder verdict when the composer provided no base reference", () => {
+    const shapes: AreaShapes = { biblica_teologica: biblicalShape() };
+    const { overview } = mergeAreasIntoAnalysis(baseRequest([]), shapes);
+    expect(overview.consistencyWithStatedIntent).toBe("nao_foi_possivel_determinar");
+    expect(overview.consistencyExplanation).toContain("nenhuma referência bíblica base foi informada");
+  });
+
+  it("uses the AI's real verdict and explanation when a base reference was provided and answered in detail", () => {
+    const shapes: AreaShapes = {
+      biblica_teologica: biblicalShape({
+        consistenciaComReferenciaDoUsuario: "consistente",
+        explicacaoConsistenciaReferencia:
+          "A letra fala de confiança em meio à dificuldade, o que está alinhado ao contexto de conforto " +
+          "presente em João 3:16 sobre o amor de Deus pelo mundo.",
+      }),
+    };
+    const { overview } = mergeAreasIntoAnalysis(baseRequest(["João 3:16"]), shapes);
+    expect(overview.consistencyWithStatedIntent).toBe("consistente");
+    expect(overview.consistencyExplanation).toContain("confiança em meio à dificuldade");
+  });
+
+  it("falls back to a not-reliable message when a base reference was provided but the AI's explanation is too vague", () => {
+    const shapes: AreaShapes = {
+      biblica_teologica: biblicalShape({
+        consistenciaComReferenciaDoUsuario: "consistente",
+        explicacaoConsistenciaReferencia: "Faz sentido.",
+      }),
+    };
+    const { overview } = mergeAreasIntoAnalysis(baseRequest(["João 3:16"]), shapes);
+    expect(overview.consistencyExplanation).toContain("Não foi possível avaliar de forma confiável");
   });
 });

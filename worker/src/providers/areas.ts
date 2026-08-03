@@ -1,5 +1,6 @@
 import {
   BibleRelationTypeSchema,
+  ConsistencyLevelSchema,
   GrammarFindingSchema,
   GrammarFindingTypeSchema,
   LyricalEmotionSchema,
@@ -62,6 +63,9 @@ export const BiblicalAIShapeSchema = z.object({
   observacoesTeologicas: z.array(z.string()).default([]),
   pontosFortes: z.array(z.string()).default([]),
   alertas: z.array(z.string()).default([]),
+  /** Only filled when the composer provided base reference(s) — never guessed on its own. */
+  consistenciaComReferenciaDoUsuario: ConsistencyLevelSchema.default("nao_foi_possivel_determinar"),
+  explicacaoConsistenciaReferencia: z.string().default(""),
 });
 export type BiblicalAIShape = z.infer<typeof BiblicalAIShapeSchema>;
 
@@ -484,23 +488,63 @@ const AREA_FOCUS_GEMINI_OVERRIDES: Partial<Record<Area, string>> = {
     "duas sugestões acionáveis.",
 };
 
+// When the composer already had a base verse in mind (context.bibleReferencesProvidedByUser),
+// the biblica_teologica area is asked to explicitly check whether the lyric's content really
+// fits that passage's context — not just whether it name-drops similar words — and to report a
+// real consistency verdict instead of the static "não avaliado" placeholder.
+function userProvidedReferencesInstructions(refs: string[], concise: boolean): string {
+  const trimmed = refs.map((r) => r.trim()).filter(Boolean);
+  if (trimmed.length === 0) return "";
+
+  const plural = trimmed.length > 1;
+  const list = trimmed.map((r) => `"${r}"`).join(", ");
+
+  if (concise) {
+    return (
+      `\n\nO compositor indicou ${plural ? "estas referências base" : "esta referência base"}: ${list}. ` +
+      "Avalie objetivamente se a letra faz sentido com o contexto dessa(s) passagem(ns) e preencha " +
+      "consistenciaComReferenciaDoUsuario e explicacaoConsistenciaReferencia (1 frase objetiva)."
+    );
+  }
+
+  return (
+    `\n\nO compositor já tem em mente ${plural ? "estas referências bíblicas base" : "esta referência bíblica base"}: ` +
+    `${list}. Leia o contexto geral dessa(s) passagem(ns) — não apenas a frase isolada — e avalie se o conteúdo e a ` +
+    "mensagem da letra realmente fazem sentido com esse contexto, não apenas se usam palavras parecidas. Preencha " +
+    "consistenciaComReferenciaDoUsuario com o nível real (muito_consistente, consistente, parcialmente_consistente, " +
+    "precisa_revisao, ou nao_foi_possivel_determinar) e explique em explicacaoConsistenciaReferencia, em pelo menos " +
+    "duas frases específicas — citando trechos da letra e a ideia central da passagem —, por que a letra combina ou " +
+    "não combina. Inclua também essa(s) referência(s) em referenciasBiblicas normalmente."
+  );
+}
+
 export function areaUserPayload(
   area: Area,
-  _request: AnalyzeRequest,
+  request: AnalyzeRequest,
   sections: SongSection[],
   variant: "padrao" | "gemini" = "padrao"
 ): string {
   const focus = variant === "gemini" ? (AREA_FOCUS_GEMINI_OVERRIDES[area] ?? AREA_FOCUS[area]) : AREA_FOCUS[area];
-  return `${focus}
+  const userVersesSuffix =
+    area === "biblica_teologica"
+      ? userProvidedReferencesInstructions(request.context.bibleReferencesProvidedByUser, false)
+      : "";
+  return `${focus}${userVersesSuffix}
 
 <letra_do_usuario>
 ${formatSections(sections)}
 </letra_do_usuario>`;
 }
 
-export function areaRetryUserPayload(area: Area, sections: SongSection[]): string {
+export function areaRetryUserPayload(
+  area: Area,
+  sections: SongSection[],
+  userProvidedReferences: string[] = []
+): string {
   const focus = AREA_FOCUS_RETRY_OVERRIDES[area] ?? `${AREA_FOCUS[area]} Seja breve.`;
-  return `${focus}
+  const userVersesSuffix =
+    area === "biblica_teologica" ? userProvidedReferencesInstructions(userProvidedReferences, true) : "";
+  return `${focus}${userVersesSuffix}
 
 <letra_do_usuario>
 ${formatSections(sections)}
@@ -872,6 +916,18 @@ export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShap
 
   const chorusPresent = false;
 
+  const hasUserProvidedReferences = request.context.bibleReferencesProvidedByUser.length > 0;
+  const consistencyWithStatedIntent =
+    hasUserProvidedReferences && biblical?.consistenciaComReferenciaDoUsuario
+      ? biblical.consistenciaComReferenciaDoUsuario
+      : "nao_foi_possivel_determinar";
+  const consistencyExplanation =
+    hasUserProvidedReferences && !isVagueExplanation(biblical?.explicacaoConsistenciaReferencia ?? "")
+      ? biblical!.explicacaoConsistenciaReferencia
+      : hasUserProvidedReferences
+        ? "Não foi possível avaliar de forma confiável a consistência com a(s) referência(s) informada(s) nesta análise."
+        : "Consistência com a intenção declarada não é avaliada nesta versão da análise, pois nenhuma referência bíblica base foi informada.";
+
   return {
     overview: {
       perceivedCentralMessage: messagePerceived,
@@ -882,8 +938,8 @@ export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShap
       likelyUsageContext: request.context.usageContext ?? "Não determinado",
       strengths,
       attentionPoints: dedupe(biblical?.alertas ?? []),
-      consistencyWithStatedIntent: "nao_foi_possivel_determinar",
-      consistencyExplanation: "Consistência com a intenção declarada não é avaliada nesta versão da análise.",
+      consistencyWithStatedIntent,
+      consistencyExplanation,
     },
     bibleReferences,
     biblicalContext: [],
