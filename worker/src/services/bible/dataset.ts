@@ -331,6 +331,21 @@ export const CURATED_VERSES: CuratedVerse[] = [
       "potestades, nem o presente, nem o porvir, nem a altura, nem a profundidade, nem alguma outra " +
       "criatura nos poderá separar do amor de Deus, que está em Cristo Jesus, nosso Senhor.",
     aliases: ["rm 8:38-39", "romanos 8:38-39"],
+    // Common paraphrases/rhetorical echoes of this passage (and of the closely related
+    // Romanos 8:35 "Quem nos separará do amor de Cristo?") — a lyric doesn't need to quote
+    // the verse word-for-word for this to be a real, well-known allusion.
+    allusionPhrases: [
+      "quem podera nos separar de ti",
+      "quem podera nos separar do teu amor",
+      "quem nos separara do amor de cristo",
+      "quem nos separara do teu amor",
+      "nada podera nos separar do teu amor",
+      "nada podera nos separar do amor de deus",
+      "nada nos separara do amor de deus",
+      "nada nos separara do teu amor",
+      "nem a morte nem a vida podera nos separar",
+      "nem a morte nem a vida nos separara",
+    ],
   },
   {
     book: "Romanos",

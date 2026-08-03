@@ -30,6 +30,8 @@ function ReferenceCard({
   reference: BibleReference;
   context?: AnalysisResult["biblicalContext"][number];
 }) {
+  const hasExplanation = reference.explanationAvailable;
+
   return (
     <div className="rounded-lg border border-blue-500/25 bg-blue-500/5 p-3 text-sm">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -39,10 +41,15 @@ function ReferenceCard({
         </span>
         <ConfidenceBadge level={reference.confidence} />
       </div>
-      <blockquote className="mt-1.5 border-l-2 border-blue-500/30 pl-2 italic text-ink-700/80 dark:text-parchment-100/70">
-        "{reference.excerptFromLyrics}"
-      </blockquote>
-      <p className="mt-1.5 text-ink-700/80 dark:text-parchment-100/70">{reference.explanation}</p>
+
+      {hasExplanation && (
+        <blockquote className="mt-1.5 border-l-2 border-blue-500/30 pl-2 italic text-ink-700/80 dark:text-parchment-100/70">
+          "{reference.excerptFromLyrics}"
+        </blockquote>
+      )}
+      {hasExplanation && (
+        <p className="mt-1.5 text-ink-700/80 dark:text-parchment-100/70">{reference.explanation}</p>
+      )}
 
       {reference.verseTextAvailable && reference.verseText ? (
         <div className="mt-2 rounded border border-blue-500/20 bg-white/50 p-2 dark:bg-ink-900/40">
@@ -55,6 +62,14 @@ function ReferenceCard({
         <p className="mt-2 text-xs text-ink-700/50 dark:text-parchment-100/40">
           Texto do versículo não disponível no conjunto de demonstração — confirme em uma Bíblia
           oficial.
+        </p>
+      )}
+
+      {!hasExplanation && (
+        <p className="mt-2 border-t border-blue-500/20 pt-2 text-xs text-ink-700/50 dark:text-parchment-100/40">
+          <span className="font-medium">Informações detalhadas: </span>
+          A análise não forneceu uma explicação específica de como esta referência se relaciona
+          com a letra nesta tentativa.
         </p>
       )}
 

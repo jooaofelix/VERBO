@@ -17,6 +17,7 @@ function ref(overrides: Partial<BibleReference>): BibleReference {
     relationType: "parafrase",
     proximity: "alta",
     explanation: "explicação",
+    explanationAvailable: true,
     confidence: "medium",
     translationUsed: "desconhecida",
     verseTextAvailable: false,
@@ -90,6 +91,12 @@ describe("detectCuratedAllusions", () => {
       "Aqueles que semeiam com lágrimas colherão com a alegria";
     const found = detectCuratedAllusions(lyrics);
     expect(found).toHaveLength(1);
+  });
+
+  it("catches a contextual paraphrase ('quem poderá nos separar de ti?') as an allusion to Romanos 8:38-39, not just literal quotes", () => {
+    const lyrics = "Verso\nQuem poderá nos separar de ti?\nNada nos separa do teu amor";
+    const [found] = detectCuratedAllusions(lyrics);
+    expect(found?.referenceLabel).toBe("Romanos 8:38-39");
   });
 });
 

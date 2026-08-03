@@ -122,6 +122,7 @@ describe("mergeAreasIntoAnalysis — biblical reference relation text", () => {
     expect(ref.explanation).toBe(
       "A letra descreve caminhar em vales escuros sem temer, ecoando este salmo."
     );
+    expect(ref.explanationAvailable).toBe(true);
   });
 
   it("never shows the bare category label ('Temática', 'Alusão'...) as if it were a real excerpt/explanation", () => {
@@ -143,6 +144,8 @@ describe("mergeAreasIntoAnalysis — biblical reference relation text", () => {
       // Falls back to the reference label itself, never a fabricated excerpt.
       expect(ref.excerptFromLyrics).toBe(ref.referenceLabel);
       expect(ref.explanation.length).toBeGreaterThan(20);
+      // Flagged so the UI can demote this fallback text instead of showing it as a real explanation.
+      expect(ref.explanationAvailable).toBe(false);
     }
   });
 

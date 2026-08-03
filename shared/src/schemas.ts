@@ -84,6 +84,8 @@ export const BibleReferenceSchema = z.object({
   relationType: BibleRelationTypeSchema,
   proximity: ProximitySchema,
   explanation: z.string(),
+  /** False when the AI identified the reference but didn't provide a real, specific explanation of its relation to the lyrics — `explanation` then holds a fallback notice, not a fabricated one. */
+  explanationAvailable: z.boolean().default(true),
   confidence: ConfidenceLevelSchema,
   translationUsed: z.string(),
   verseText: z.string().optional(),

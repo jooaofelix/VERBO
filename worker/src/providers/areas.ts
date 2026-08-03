@@ -327,11 +327,15 @@ const AREA_FOCUS: Record<Area, string> = {
     "Faça uma revisão bíblica de texto e de contexto. Identifique referências bíblicas prováveis (ex.: " +
     "\"Salmos 23:1\"), sua relação com a letra e o tipo (direta, alusão ou temática), explicando em pelo " +
     "menos uma frase específica por que a conexão faz sentido à luz do contexto da passagem — nunca uma " +
-    "resposta de uma palavra só, como \"temática\" ou \"alusão\". Nunca escreva o texto do versículo, " +
-    "apenas a referência. Acrescente observações teológicas e pontos fortes citando elementos concretos da " +
-    "letra (uma frase-eixo repetida, uma alusão bíblica específica, uma declaração sobre o caráter de " +
-    "Deus) — nunca elogios genéricos. Classifique o gênero da canção como testemunho, redenção, " +
-    "restauração, esperança em Deus, gratidão, confiança ou adoração; nunca como \"autoajuda\".",
+    "resposta de uma palavra só, como \"temática\" ou \"alusão\". Não procure apenas citações literais: " +
+    "uma pergunta retórica ou uma frase reescrita com outras palavras que comunique a mesma ideia de um " +
+    "versículo conhecido (ex.: \"quem poderá nos separar de ti?\" ecoando Romanos 8:35/38-39) também é " +
+    "uma alusão real e deve ser identificada pelo sentido, não pela semelhança literal das palavras. " +
+    "Nunca escreva o texto do versículo, apenas a referência. Acrescente observações teológicas e pontos " +
+    "fortes citando elementos concretos da letra (uma frase-eixo repetida, uma alusão bíblica específica, " +
+    "uma declaração sobre o caráter de Deus) — nunca elogios genéricos. Classifique o gênero da canção " +
+    "como testemunho, redenção, restauração, esperança em Deus, gratidão, confiança ou adoração; nunca " +
+    "como \"autoajuda\".",
   portugues:
     "Revise a letra em português palavra por palavra e frase por frase: ortografia, concordância, " +
     "regência, pontuação, clareza, coerência, consistência de pessoa verbal (1ª pessoa \"eu\" vs. 1ª " +
@@ -387,18 +391,22 @@ const AREA_FOCUS_GEMINI_OVERRIDES: Partial<Record<Area, string>> = {
   biblica_teologica:
     "Faça uma revisão bíblica de texto e de contexto com toda a profundidade possível — esta é a área " +
     "central da análise. Identifique referências bíblicas prováveis (ex.: \"Salmos 23:1\"). Se a letra " +
-    "permitir, identifique de 3 a 5 referências distintas, não apenas uma ou duas. Para CADA referência, " +
-    "classifique o tipo (direta, alusão ou temática) e escreva em relacaoComALetra pelo menos duas frases " +
-    "específicas: (1) qual trecho ou imagem exata da letra remete a essa passagem, citando palavras da " +
-    "própria letra, e (2) por que essa conexão faz sentido teologicamente à luz do contexto histórico e " +
-    "literário da passagem, não apenas da frase isolada — nunca uma resposta de uma palavra só, como " +
-    "\"temática\" ou \"alusão\". Nunca escreva o texto do versículo, apenas a referência. Acrescente pelo " +
-    "menos três observações teológicas específicas (nunca genéricas) sobre como a letra dialoga com " +
-    "doutrinas ou temas bíblicos centrais, alertas quando alguma afirmação da letra pareça teologicamente " +
-    "imprecisa ou carecer de contexto, e pontos fortes citando elementos concretos da letra (uma frase-eixo " +
-    "repetida, uma alusão bíblica específica, uma declaração sobre o caráter de Deus) — nunca elogios " +
-    "genéricos. Classifique o gênero da canção como testemunho, redenção, restauração, esperança em Deus, " +
-    "gratidão, confiança ou adoração; nunca como \"autoajuda\".",
+    "permitir, identifique de 3 a 5 referências distintas, não apenas uma ou duas. Procure tanto citações " +
+    "diretas quanto alusões pelo SENTIDO: uma pergunta retórica ou uma frase com outras palavras que " +
+    "comunique a mesma ideia de um versículo conhecido também conta (ex.: \"quem poderá nos separar de " +
+    "ti?\" ecoando Romanos 8:35/38-39, ou \"tu me sustentas\" ecoando Salmos 23) — nunca exija semelhança " +
+    "literal de palavras para reconhecer uma alusão real. Para CADA referência, classifique o tipo (direta, " +
+    "alusão ou temática) e escreva em relacaoComALetra pelo menos duas frases específicas: (1) qual trecho " +
+    "ou imagem exata da letra remete a essa passagem, citando palavras da própria letra, e (2) por que essa " +
+    "conexão faz sentido teologicamente à luz do contexto histórico e literário da passagem, não apenas da " +
+    "frase isolada — nunca uma resposta de uma palavra só, como \"temática\" ou \"alusão\". Nunca escreva o " +
+    "texto do versículo, apenas a referência. Acrescente pelo menos três observações teológicas específicas " +
+    "(nunca genéricas) sobre como a letra dialoga com doutrinas ou temas bíblicos centrais, alertas quando " +
+    "alguma afirmação da letra pareça teologicamente imprecisa ou carecer de contexto, e pontos fortes " +
+    "citando elementos concretos da letra (uma frase-eixo repetida, uma alusão bíblica específica, uma " +
+    "declaração sobre o caráter de Deus) — nunca elogios genéricos. Classifique o gênero da canção como " +
+    "testemunho, redenção, restauração, esperança em Deus, gratidão, confiança ou adoração; nunca como " +
+    "\"autoajuda\".",
 };
 
 // When the composer already had a base verse in mind (context.bibleReferencesProvidedByUser),
@@ -648,6 +656,7 @@ function mapBiblicalReferences(
         explanation: hasUsableRelation
           ? item.relacaoComALetra
           : "A análise identificou esta referência, mas não forneceu uma explicação detalhada da relação com a letra nesta tentativa.",
+        explanationAvailable: hasUsableRelation,
         confidence: confidenceForTipo(item.tipo),
         translationUsed: request.bibleTranslationPreference,
         verseTextAvailable: false,

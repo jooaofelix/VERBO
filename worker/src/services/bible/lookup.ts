@@ -125,6 +125,7 @@ export function detectCuratedAllusions(lyrics: string): BibleReference[] {
       explanation:
         "Frase da letra corresponde a uma alusão bem conhecida a este versículo, reconhecida " +
         "automaticamente por um conjunto curado, independente do que o modelo de IA identificou.",
+      explanationAvailable: true,
       confidence: "high",
       translationUsed: "dominio_publico_almeida",
       verseTextAvailable: false,
