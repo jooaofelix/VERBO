@@ -433,8 +433,7 @@ const AREA_FOCUS_RETRY_OVERRIDES: Partial<Record<Area, string>> = {
 // Gemini isn't bound by Cloudflare's per-request neuron/timeout budget the
 // way the free Workers AI model is, so when it's the one answering, it can
 // afford to be asked for meaningfully more: more corrections, more
-// references, longer per-item explanations. Used only for the primary
-// Gemini attempt on "portugues" and "biblica_teologica" — the Workers AI
+// references, longer per-item explanations, in every area. The Workers AI
 // retry (if Gemini fails) always falls back to the terser AREA_FOCUS above,
 // which is calibrated for that smaller model's real capacity.
 const AREA_FOCUS_GEMINI_OVERRIDES: Partial<Record<Area, string>> = {
@@ -463,6 +462,26 @@ const AREA_FOCUS_GEMINI_OVERRIDES: Partial<Record<Area, string>> = {
     "frase-eixo repetida, uma alusão bíblica específica, uma declaração sobre o caráter de Deus) — nunca " +
     "elogios genéricos. Classifique o gênero da canção como testemunho, redenção, restauração, esperança " +
     "em Deus, gratidão, confiança ou adoração; nunca como \"autoajuda\".",
+  composicao:
+    "Analise a composição com profundidade real: estrutura (introdução, versos, pré-refrão, refrão, ponte, " +
+    "encerramento), classificação lírica, emoção predominante e como ela se desenvolve ao longo da letra, " +
+    "energia textual, tema central, observações de produção e sugestões. Em observacoesProducao, cite pelo " +
+    "menos duas ou três observações específicas sobre estrutura, função do refrão, uso de repetição ou " +
+    "construção da narrativa — nunca uma frase genérica de uma linha. Nos pontos fortes, cite elementos " +
+    "concretos da letra (por exemplo: progressão de uma emoção para outra, repetição de uma frase-eixo " +
+    "específica, linguagem acessível, contraste entre seções) — nunca elogios genéricos como \"letra " +
+    "bonita\". Em sugestões, ofereça pelo menos duas ou três sugestões acionáveis e específicas, citando " +
+    "trechos da letra quando possível. Nunca classifique a canção como \"autoajuda\"; prefira testemunho, " +
+    "redenção, restauração, esperança em Deus, gratidão, confiança ou adoração.",
+  congregacional:
+    "Avalie o uso congregacional com profundidade real: adequação para o culto (explicando por que serve ou " +
+    "não, em pelo menos duas frases), facilidade de canto (repetição de frases, previsibilidade do texto, " +
+    "extensão aproximada de vocabulário emocional), clareza da mensagem para uma comunidade diversa em idade " +
+    "e tempo de fé, pontos fortes específicos e sugestões concretas de ajuste. Cada campo de texto deve ter " +
+    "pelo menos duas frases específicas, citando trechos da letra quando relevante — nunca uma frase " +
+    "genérica de uma linha como \"letra adequada para culto\". Em pontosFortes, cite elementos concretos " +
+    "(repetição fácil de memorizar, linguagem acessível, tema unificador). Em sugestões, ofereça pelo menos " +
+    "duas sugestões acionáveis.",
 };
 
 export function areaUserPayload(

@@ -245,13 +245,12 @@ Sem esse secret configurado, o comportamento é idêntico ao anterior: referênc
 conjunto curado continuam mostrando apenas a referência + explicação da IA, sem texto de
 versículo — nunca um texto inventado.
 
-## IA paga opcional (Google Gemini) para português e referência bíblica
+## IA paga opcional (Google Gemini) para toda a análise
 
 Se você já tem billing ativo no Google (Firebase Blaze ou um projeto Google Cloud com
-faturamento), pode configurar uma chave do Gemini para melhorar especificamente as duas áreas
-mais criticadas: revisão de português e identificação de referências bíblicas. **Nenhuma outra
-área é afetada** — composição e adequação congregacional continuam sempre no Workers AI
-gratuito.
+faturamento), pode configurar uma chave do Gemini para melhorar a qualidade de **todas as
+áreas** de uma "revisão completa" (português, bíblica/teológica, composição e congregacional) —
+não só uma parte.
 
 1. Gere uma chave em [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (mesmo
    projeto/conta do seu billing do Google).
@@ -262,14 +261,15 @@ cd worker
 npx wrangler secret put GEMINI_API_KEY
 ```
 
-Com a chave configurada, a chamada principal de português e de bíblica/teológica passa a usar o
-Gemini (`gemini-2.0-flash`); se essa chamada falhar por qualquer motivo (rede, chave inválida,
-resposta bloqueada), a nova tentativa cai automaticamente de volta no Workers AI gratuito — o
-Gemini nunca é uma dependência obrigatória, apenas um reforço de qualidade quando disponível.
-Sem o secret configurado, o comportamento é idêntico ao atual (100% Workers AI). O texto de
-versículo bíblico continua vindo sempre do conjunto curado ou do abibliadigital.com.br — a IA
-(Gemini ou Workers AI) nunca gera o texto do versículo em si, apenas identifica a referência e
-explica a relação com a letra.
+Com a chave configurada, a chamada principal de cada área passa a usar o Gemini
+(`gemini-2.0-flash`), com prompts mais detalhados e orçamento de tokens maior do que o usado no
+Workers AI (o Gemini não sofre do mesmo limite de tempo/neurônios da Cloudflare); se uma chamada
+falhar por qualquer motivo (rede, chave inválida, resposta bloqueada), a nova tentativa daquela
+área cai automaticamente de volta no Workers AI gratuito — o Gemini nunca é uma dependência
+obrigatória, apenas um reforço de qualidade quando disponível. Sem o secret configurado, o
+comportamento é idêntico ao atual (100% Workers AI). O texto de versículo bíblico continua vindo
+sempre do conjunto curado ou do abibliadigital.com.br — a IA (Gemini ou Workers AI) nunca gera o
+texto do versículo em si, apenas identifica a referência e explica a relação com a letra.
 
 O endpoint `GET /health` do Worker expõe `geminiConfigured` e `abibliadigitalConfigured` (`true`/
 `false`) para você confirmar rapidamente, depois do deploy, se os secrets foram reconhecidos.

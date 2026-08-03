@@ -736,7 +736,7 @@ function mockGeminiFetchOnce(jsonText: string) {
   }));
 }
 
-describe("WorkersAIProvider — Gemini for português and biblica_teologica only", () => {
+describe("WorkersAIProvider — Gemini as primary attempt for every area", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -778,21 +778,58 @@ describe("WorkersAIProvider — Gemini for português and biblica_teologica only
     expect(result.bibleReferences).toHaveLength(1);
   });
 
-  it("never uses Gemini for composicao or congregacional, even when a key is configured", async () => {
-    const fetchMock = vi.fn();
+  it("uses Gemini for composicao when a key is configured", async () => {
+    const fetchMock = mockGeminiFetchOnce(JSON.stringify(composicaoFixture()));
     vi.stubGlobal("fetch", fetchMock);
-    const run = vi.fn().mockResolvedValue({ response: composicaoFixture() });
+    const run = vi.fn();
     const provider = new WorkersAIProvider({ run } as unknown as Ai, "fake-gemini-key");
 
-    await provider.analyzeLyrics({
+    const result = await provider.analyzeLyrics({
       request: baseRequest("composicao"),
       sections: sections(),
       deterministicGrammar: [],
       prosody: [],
     });
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(run).not.toHaveBeenCalled();
+    expect(result.overview.compositionType).toBeTruthy();
+  });
+
+  it("uses Gemini for congregacional when a key is configured", async () => {
+    const fetchMock = mockGeminiFetchOnce(JSON.stringify(congregacionalFixture()));
+    vi.stubGlobal("fetch", fetchMock);
+    const run = vi.fn();
+    const provider = new WorkersAIProvider({ run } as unknown as Ai, "fake-gemini-key");
+
+    await provider.analyzeLyrics({
+      request: baseRequest("congregacional"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Workers AI for composicao/congregacional when Gemini fails, same safety net as the other areas", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) }))
+    );
+    const run = vi.fn().mockResolvedValue({ response: congregacionalFixture() });
+    const provider = new WorkersAIProvider({ run } as unknown as Ai, "fake-gemini-key");
+
+    const result = await provider.analyzeLyrics({
+      request: baseRequest("congregacional"),
+      sections: sections(),
+      deterministicGrammar: [],
+      prosody: [],
+    });
+
     expect(run).toHaveBeenCalledTimes(1);
+    expect(result.sectionStatus).toEqual({});
   });
 
   it("falls back to the Workers AI retry (3B model) when Gemini fails, instead of failing the whole area", async () => {

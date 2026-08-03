@@ -267,9 +267,15 @@ describe("areaUserPayload — Gemini gets a richer, higher-capacity prompt", () 
     expect(geminiPayload).toContain("pelo menos duas frases específicas");
   });
 
-  it("falls back to the default focus for areas without a Gemini-specific override (e.g. composicao)", () => {
-    const defaultPayload = areaUserPayload("composicao", baseRequest(), sections);
-    const geminiPayload = areaUserPayload("composicao", baseRequest(), sections, "gemini");
-    expect(geminiPayload).toBe(defaultPayload);
+  it("gives composicao and congregacional richer, more specific prompts too, since Gemini now covers every area", () => {
+    const defaultComposicao = areaUserPayload("composicao", baseRequest(), sections);
+    const geminiComposicao = areaUserPayload("composicao", baseRequest(), sections, "gemini");
+    expect(geminiComposicao).not.toBe(defaultComposicao);
+    expect(geminiComposicao).toContain("duas ou três observações específicas");
+
+    const defaultCongregacional = areaUserPayload("congregacional", baseRequest(), sections);
+    const geminiCongregacional = areaUserPayload("congregacional", baseRequest(), sections, "gemini");
+    expect(geminiCongregacional).not.toBe(defaultCongregacional);
+    expect(geminiCongregacional).toContain("pelo menos duas frases específicas");
   });
 });

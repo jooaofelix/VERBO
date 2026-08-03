@@ -50,12 +50,16 @@ const PORTUGUES_TEMPERATURE = 0.1;
 const PORTUGUES_MAX_TOKENS = 800;
 const PORTUGUES_RETRY_MAX_TOKENS = 450;
 
-// When a Gemini API key is configured, these are the only two areas that
-// use it — exactly the ones the user asked to strengthen (revisão de
-// português e validação de referência bíblica). Every other area, and this
-// area's own retry if Gemini itself fails, stays on the free Workers AI
-// binding — Gemini is additive, never a hard dependency.
-const GEMINI_AREAS: ReadonlySet<Area> = new Set(["portugues", "biblica_teologica"]);
+// When a Gemini API key is configured, it's used as the primary attempt for
+// every area — the retry (if Gemini itself fails) always stays on the free
+// Workers AI binding regardless, so Gemini is additive, never a hard
+// dependency.
+const GEMINI_AREAS: ReadonlySet<Area> = new Set([
+  "portugues",
+  "biblica_teologica",
+  "composicao",
+  "congregacional",
+]);
 
 // Gemini isn't constrained by Cloudflare's per-request neuron/timeout
 // budget, so its primary attempt can afford noticeably more room than the
@@ -64,6 +68,8 @@ const GEMINI_AREAS: ReadonlySet<Area> = new Set(["portugues", "biblica_teologica
 const GEMINI_MAX_TOKENS: Partial<Record<Area, number>> = {
   portugues: 1400,
   biblica_teologica: 900,
+  composicao: 900,
+  congregacional: 700,
 };
 
 const TIMEOUT_MESSAGE = "Esta parte da análise demorou mais que o esperado. Tente novamente.";

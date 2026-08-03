@@ -14,7 +14,7 @@ export interface Env {
   ALLOWED_ORIGIN: string;
   /** Optional free API token for abibliadigital.com.br (register at the site to get one). Verse lookups outside the curated dataset simply stay unavailable when this isn't set. */
   ABIBLIADIGITAL_TOKEN?: string;
-  /** Optional Gemini API key (Google AI Studio). When set, used only for the "portugues" and "biblica_teologica" areas; every other area, and the retry if Gemini itself fails, stays on the free Workers AI binding. */
+  /** Optional Gemini API key (Google AI Studio). When set, used as the primary attempt for every area of "revisão completa"; the retry, if Gemini itself fails, always stays on the free Workers AI binding. */
   GEMINI_API_KEY?: string;
 }
 
