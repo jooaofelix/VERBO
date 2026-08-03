@@ -180,6 +180,65 @@ function withOverlapBoost(ref: BibleReference, verseText: string): Partial<Bible
 }
 
 /**
+ * Minimal, local duplicate of the free-text reference parsing the AI-facing
+ * code does (book/chapter/verse from a string like "Romanos 8:28") — kept
+ * separate so this bible-lookup module has no dependency on the providers
+ * layer.
+ */
+function parseFreeTextReference(label: string): { book: string; chapterStart: number; verseStart: number } | null {
+  const trimmed = label.trim();
+  const match = trimmed.match(/^([1-3]?\s?[A-Za-zÀ-ÿ.]+(?:\s[A-Za-zÀ-ÿ.]+)*?)\s+(\d+)(?::(\d+))?/);
+  if (!match) return null;
+  const [, book, chapter, verse] = match;
+  return { book: book.trim(), chapterStart: Number(chapter), verseStart: verse ? Number(verse) : 1 };
+}
+
+export interface ResolvedUserReference {
+  label: string;
+  text?: string;
+  attribution?: string;
+}
+
+/**
+ * Resolves each base verse the composer typed in directly against real
+ * scripture text (curated dataset first, then abibliadigital.com.br) so the
+ * AI evaluates historical context and lyric-fit against the actual passage —
+ * never against its own possibly-hallucinated memory of what a reference
+ * says. A reference that can't be resolved anywhere is passed through with
+ * no text, never a fabricated one.
+ */
+export async function resolveUserProvidedReferences(
+  refs: string[],
+  abibliadigitalToken?: string
+): Promise<ResolvedUserReference[]> {
+  const trimmed = refs.map((r) => r.trim()).filter(Boolean);
+
+  return Promise.all(
+    trimmed.map(async (label): Promise<ResolvedUserReference> => {
+      const curated = lookupVerse(label);
+      if (curated.found && curated.text) {
+        return { label: curated.referenceLabel, text: curated.text, attribution: curated.attribution };
+      }
+
+      const parsed = parseFreeTextReference(label);
+      if (!parsed) return { label };
+
+      const byRange = findCuratedByRange(parsed.book, parsed.chapterStart, parsed.verseStart);
+      if (byRange) {
+        return { label, text: byRange.text, attribution: BIBLE_DATASET_DISCLAIMER };
+      }
+
+      const external = await fetchExternalVerse(parsed.book, parsed.chapterStart, parsed.verseStart, abibliadigitalToken);
+      if (external) {
+        return { label, text: external.text, attribution: EXTERNAL_ATTRIBUTION };
+      }
+
+      return { label };
+    })
+  );
+}
+
+/**
  * The AI is instructed never to output verse text, but this is the actual
  * safety net: whatever the model claims about `verseText`/`verseTextAvailable`
  * is discarded and replaced by a real lookup — first against the small

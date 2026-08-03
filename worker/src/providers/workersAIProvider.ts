@@ -19,6 +19,7 @@ import {
 } from "./areas.js";
 import { runGeminiCompletion, GEMINI_MODEL } from "./geminiClient.js";
 import type { AIAnalysisProvider, LyricsAnalysisInput } from "./provider.js";
+import type { ResolvedUserReference } from "../services/bible/lookup.js";
 import {
   QUICK_JSON_SCHEMA,
   QUICK_SYSTEM_PROMPT,
@@ -124,7 +125,7 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     if (input.request.revisionMode === "rapida") {
       return this.runQuickReview(input.request, input.sections);
     }
-    return this.runAreaBasedReview(input.request, input.sections);
+    return this.runAreaBasedReview(input.request, input.sections, input.resolvedUserReferences ?? []);
   }
 
   // ---- revisão rápida: exactly one call, one retry, never partial (all-or-nothing) ----
@@ -174,7 +175,8 @@ export class WorkersAIProvider implements AIAnalysisProvider {
 
   private async runAreaBasedReview(
     request: AnalyzeRequest,
-    sections: SongSection[]
+    sections: SongSection[],
+    resolvedUserReferences: ResolvedUserReference[]
   ): Promise<AIProducedAnalysis> {
     const areas = areasForMode(request.revisionMode);
     const primaryMaxTokens =
@@ -186,7 +188,7 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     // Run one area at a time (not in parallel) to keep load on Workers AI
     // predictable and make a single failing area easy to isolate.
     for (const area of areas) {
-      const { status, data } = await this.runArea(area, request, sections, primaryMaxTokens);
+      const { status, data } = await this.runArea(area, request, sections, primaryMaxTokens, resolvedUserReferences);
       (shapes as Record<Area, AreaAIShape>)[area] = data;
       if (status !== "ok") {
         sectionStatus[area] = { status, mensagem: messageForStatus(status) };
@@ -209,7 +211,8 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     area: Area,
     request: AnalyzeRequest,
     sections: SongSection[],
-    maxTokens: number
+    maxTokens: number,
+    resolvedUserReferences: ResolvedUserReference[]
   ): Promise<{ status: "ok" | "timeout" | "formato_invalido" | "indisponivel"; data: AreaAIShape }> {
     const isPortugues = area === "portugues";
     const primaryModel = isPortugues ? MODEL_PORTUGUES : MODEL_DEFAULT;
@@ -219,7 +222,10 @@ export class WorkersAIProvider implements AIAnalysisProvider {
     const usesGemini = Boolean(this.geminiApiKey) && GEMINI_AREAS.has(area);
     const primaryMessages: ChatMessage[] = [
       { role: "system", content: AREA_SYSTEM_PROMPT },
-      { role: "user", content: areaUserPayload(area, request, sections, usesGemini ? "gemini" : "padrao") },
+      {
+        role: "user",
+        content: areaUserPayload(area, sections, usesGemini ? "gemini" : "padrao", resolvedUserReferences),
+      },
     ];
     const geminiMaxTokens = GEMINI_MAX_TOKENS[area] ?? primaryMaxTokens;
 
@@ -249,7 +255,7 @@ export class WorkersAIProvider implements AIAnalysisProvider {
         { role: "system", content: AREA_SYSTEM_PROMPT_RETRY },
         {
           role: "user",
-          content: areaRetryUserPayload(area, sections, request.context.bibleReferencesProvidedByUser),
+          content: areaRetryUserPayload(area, sections, resolvedUserReferences),
         },
       ],
       retryMaxTokens,

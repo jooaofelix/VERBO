@@ -1,6 +1,6 @@
 import type { BibleReference } from "@verbo/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { detectCuratedAllusions, enrichBibleReferences, lookupVerse } from "./lookup.js";
+import { detectCuratedAllusions, enrichBibleReferences, lookupVerse, resolveUserProvidedReferences } from "./lookup.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -184,5 +184,49 @@ describe("enrichBibleReferences", () => {
 
     expect(enriched.verseTextAvailable).toBe(false);
     expect(enriched.verseText).toBeUndefined();
+  });
+});
+
+describe("resolveUserProvidedReferences", () => {
+  it("returns an empty list when the composer provided no base reference", async () => {
+    expect(await resolveUserProvidedReferences([])).toEqual([]);
+  });
+
+  it("resolves a base reference against the curated dataset directly, by label", async () => {
+    const [resolved] = await resolveUserProvidedReferences(["João 3:16"]);
+    expect(resolved.label).toBe("João 3:16");
+    expect(resolved.text).toContain("amou o mundo");
+  });
+
+  it("resolves a base reference by book/chapter/verse-in-range against a curated range (e.g. Salmos 23:4 inside curated Salmos 23:1-4)", async () => {
+    const [resolved] = await resolveUserProvidedReferences(["Salmos 23:4"]);
+    expect(resolved.text).toContain("O Senhor é o meu pastor");
+  });
+
+  it("falls back to abibliadigital for a reference outside the curated dataset when a token is configured", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ text: "Amarás o teu próximo como a ti mesmo." }),
+      }))
+    );
+
+    const [resolved] = await resolveUserProvidedReferences(["Levítico 19:34"], "fake-token");
+    expect(resolved.text).toBe("Amarás o teu próximo como a ti mesmo.");
+  });
+
+  it("passes a reference through with no text (never a fabricated one) when it can't be resolved anywhere", async () => {
+    const [resolved] = await resolveUserProvidedReferences(["Levítico 19:34"]);
+    expect(resolved.label).toBe("Levítico 19:34");
+    expect(resolved.text).toBeUndefined();
+  });
+
+  it("resolves several base references at once", async () => {
+    const resolved = await resolveUserProvidedReferences(["João 3:16", "Salmos 23"]);
+    expect(resolved).toHaveLength(2);
+    expect(resolved[0].text).toContain("amou o mundo");
+    expect(resolved[1].text).toContain("O Senhor é o meu pastor");
   });
 });

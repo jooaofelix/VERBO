@@ -18,6 +18,7 @@ import {
   type SongSection,
 } from "@verbo/shared";
 import { z } from "zod";
+import type { ResolvedUserReference } from "../services/bible/lookup.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 /**
@@ -491,44 +492,50 @@ const AREA_FOCUS_GEMINI_OVERRIDES: Partial<Record<Area, string>> = {
 // When the composer already had a base verse in mind (context.bibleReferencesProvidedByUser),
 // the biblica_teologica area is asked to explicitly check whether the lyric's content really
 // fits that passage's context — not just whether it name-drops similar words — and to report a
-// real consistency verdict instead of the static "não avaliado" placeholder.
-function userProvidedReferencesInstructions(refs: string[], concise: boolean): string {
-  const trimmed = refs.map((r) => r.trim()).filter(Boolean);
-  if (trimmed.length === 0) return "";
+// real consistency verdict instead of the static "não avaliado" placeholder. The real verse text
+// is resolved server-side (curated dataset, then abibliadigital.com.br — see
+// resolveUserProvidedReferences) and handed to the model here, so it reasons against the actual
+// passage instead of its own possibly-hallucinated memory of what a reference says.
+function userProvidedReferencesInstructions(refs: ResolvedUserReference[], concise: boolean): string {
+  if (refs.length === 0) return "";
 
-  const plural = trimmed.length > 1;
-  const list = trimmed.map((r) => `"${r}"`).join(", ");
+  const plural = refs.length > 1;
+  const list = refs
+    .map((r) => (r.text ? `${r.label}: "${r.text}"` : `${r.label} (texto não disponível)`))
+    .join("; ");
 
   if (concise) {
     return (
-      `\n\nO compositor indicou ${plural ? "estas referências base" : "esta referência base"}: ${list}. ` +
-      "Avalie objetivamente se a letra faz sentido com o contexto dessa(s) passagem(ns) e preencha " +
-      "consistenciaComReferenciaDoUsuario e explicacaoConsistenciaReferencia (1 frase objetiva)."
+      `\n\nO compositor indicou ${plural ? "estas referências base" : "esta referência base"}, com o texto ` +
+      `bíblico real entre aspas quando disponível: ${list}. Avalie, com base nesse texto (não em memória sua), ` +
+      "se a letra faz sentido com o contexto dessa(s) passagem(ns) e preencha consistenciaComReferenciaDoUsuario " +
+      "e explicacaoConsistenciaReferencia (1 frase objetiva)."
     );
   }
 
   return (
-    `\n\nO compositor já tem em mente ${plural ? "estas referências bíblicas base" : "esta referência bíblica base"}: ` +
-    `${list}. Leia o contexto geral dessa(s) passagem(ns) — não apenas a frase isolada — e avalie se o conteúdo e a ` +
-    "mensagem da letra realmente fazem sentido com esse contexto, não apenas se usam palavras parecidas. Preencha " +
-    "consistenciaComReferenciaDoUsuario com o nível real (muito_consistente, consistente, parcialmente_consistente, " +
-    "precisa_revisao, ou nao_foi_possivel_determinar) e explique em explicacaoConsistenciaReferencia, em pelo menos " +
-    "duas frases específicas — citando trechos da letra e a ideia central da passagem —, por que a letra combina ou " +
-    "não combina. Inclua também essa(s) referência(s) em referenciasBiblicas normalmente."
+    `\n\nO compositor já tem em mente ${plural ? "estas referências bíblicas base" : "esta referência bíblica base"}, ` +
+    `com o texto bíblico REAL (obtido de uma API, não de sua memória) entre aspas quando disponível: ${list}. Leia ` +
+    "o contexto histórico e teológico desse texto — não apenas a frase isolada — e avalie se o conteúdo e a " +
+    "mensagem da letra realmente fazem sentido com esse contexto, não apenas se usam palavras parecidas. Se o " +
+    "texto não estiver disponível para alguma referência, avalie com cautela e não invente o conteúdo do " +
+    "versículo. Preencha consistenciaComReferenciaDoUsuario com o nível real (muito_consistente, consistente, " +
+    "parcialmente_consistente, precisa_revisao, ou nao_foi_possivel_determinar) e explique em " +
+    "explicacaoConsistenciaReferencia, em pelo menos duas frases específicas — citando o texto bíblico e a letra " +
+    "—, por que a letra combina ou não combina. Inclua também essa(s) referência(s) em referenciasBiblicas " +
+    "normalmente."
   );
 }
 
 export function areaUserPayload(
   area: Area,
-  request: AnalyzeRequest,
   sections: SongSection[],
-  variant: "padrao" | "gemini" = "padrao"
+  variant: "padrao" | "gemini" = "padrao",
+  resolvedUserReferences: ResolvedUserReference[] = []
 ): string {
   const focus = variant === "gemini" ? (AREA_FOCUS_GEMINI_OVERRIDES[area] ?? AREA_FOCUS[area]) : AREA_FOCUS[area];
   const userVersesSuffix =
-    area === "biblica_teologica"
-      ? userProvidedReferencesInstructions(request.context.bibleReferencesProvidedByUser, false)
-      : "";
+    area === "biblica_teologica" ? userProvidedReferencesInstructions(resolvedUserReferences, false) : "";
   return `${focus}${userVersesSuffix}
 
 <letra_do_usuario>
@@ -539,11 +546,11 @@ ${formatSections(sections)}
 export function areaRetryUserPayload(
   area: Area,
   sections: SongSection[],
-  userProvidedReferences: string[] = []
+  resolvedUserReferences: ResolvedUserReference[] = []
 ): string {
   const focus = AREA_FOCUS_RETRY_OVERRIDES[area] ?? `${AREA_FOCUS[area]} Seja breve.`;
   const userVersesSuffix =
-    area === "biblica_teologica" ? userProvidedReferencesInstructions(userProvidedReferences, true) : "";
+    area === "biblica_teologica" ? userProvidedReferencesInstructions(resolvedUserReferences, true) : "";
   return `${focus}${userVersesSuffix}
 
 <letra_do_usuario>

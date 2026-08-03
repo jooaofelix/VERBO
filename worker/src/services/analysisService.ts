@@ -7,7 +7,7 @@ import {
   type SongSection,
 } from "@verbo/shared";
 import { getAIProvider } from "../providers/index.js";
-import { detectCuratedAllusions, enrichBibleReferences } from "./bible/lookup.js";
+import { detectCuratedAllusions, enrichBibleReferences, resolveUserProvidedReferences } from "./bible/lookup.js";
 import { runDeterministicChecks } from "./grammar/deterministicChecks.js";
 import { runLanguageToolCheck } from "./grammar/languageTool.js";
 import { analyzeProsody } from "./grammar/prosody.js";
@@ -70,13 +70,15 @@ function mergeGrammarFindings(base: GrammarFinding[], languageTool: GrammarFindi
  *      run in parallel with the AI call, and never allowed to fail the
  *      request: any error/timeout there just means fewer findings, not a
  *      broken analysis
- *   3. AI structured analysis (Workers AI, or a demo fallback when the "AI"
+ *   3. resolving any composer-provided base reference(s) against real verse
+ *      text (curated dataset, then abibliadigital.com.br) before the AI call
+ *   4. AI structured analysis (Workers AI, or a demo fallback when the "AI"
  *      binding isn't available)
- *   4. Bible reference enrichment against the curated dataset first, then
+ *   5. Bible reference enrichment against the curated dataset first, then
  *      (only for references not found there, and only if configured) the
  *      abibliadigital.com.br free API — both are a safety net against
  *      hallucinated verse text, never a source of it
- *   5. final schema validation before anything reaches the client
+ *   6. final schema validation before anything reaches the client
  */
 export async function runAnalysis(
   request: AnalyzeRequest,
@@ -90,9 +92,19 @@ export async function runAnalysis(
   const deterministicGrammar = runDeterministicChecks(sections);
   const prosody = analyzeProsody(sections);
 
+  // Resolved before the AI call (not in parallel with it) because the
+  // biblical/theological area needs the real verse text of any composer-
+  // provided base reference(s) inside its own prompt, to evaluate historical
+  // context and lyric-fit against the actual passage instead of the model's
+  // own memory of what a reference says.
+  const resolvedUserReferences = await resolveUserProvidedReferences(
+    request.context.bibleReferencesProvidedByUser,
+    abibliadigitalToken
+  );
+
   const provider = getAIProvider(ai, geminiApiKey);
   const [aiResult, languageToolFindings] = await Promise.all([
-    provider.analyzeLyrics({ request, sections, deterministicGrammar, prosody }),
+    provider.analyzeLyrics({ request, sections, deterministicGrammar, prosody, resolvedUserReferences }),
     runLanguageToolCheck(request.lyrics).catch(() => []),
   ]);
 
