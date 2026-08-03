@@ -134,6 +134,51 @@ export function detectCuratedAllusions(lyrics: string): BibleReference[] {
   return found;
 }
 
+// A handful of very common Portuguese function words that would otherwise
+// dominate a naive word-overlap check without indicating any real match.
+const OVERLAP_STOP_WORDS = new Set([
+  "a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em", "que", "um", "uma", "uns", "umas",
+  "para", "com", "por", "se", "na", "no", "nas", "nos", "ao", "aos", "foi", "sao", "seu", "sua", "seus",
+  "suas", "meu", "minha", "meus", "minhas", "teu", "tua", "nosso", "nossa", "ja", "ha", "mas", "ou",
+  "nao", "sim", "eu", "tu", "ele", "ela", "voces", "te", "me", "lhe", "esta", "este", "isso", "isto",
+]);
+
+function significantWords(text: string): Set<string> {
+  return new Set(
+    normalize(text)
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !OVERLAP_STOP_WORDS.has(w))
+  );
+}
+
+/**
+ * A genuinely strong reference shares real vocabulary with the verse, not
+ * just a theme guessed by the AI — this is what turns "a IA achou que
+ * combina" into "o texto realmente bate", which is the distinction the
+ * user asked for between a strong reference and a thematic one.
+ */
+function hasStrongTextualOverlap(excerpt: string, verseText: string): boolean {
+  const excerptWords = significantWords(excerpt);
+  if (excerptWords.size === 0) return false;
+  const verseWords = significantWords(verseText);
+  let shared = 0;
+  for (const word of excerptWords) {
+    if (verseWords.has(word)) shared++;
+  }
+  return shared >= 2 || shared / excerptWords.size >= 0.5;
+}
+
+/**
+ * When the lyric excerpt the AI cited actually shares real vocabulary with
+ * the verse text we just found, the reference is promoted to "alta"/"high"
+ * — a verified textual match, not a thematic guess. When it doesn't (or the
+ * text isn't available at all), the AI's own classification is left as-is.
+ */
+function withOverlapBoost(ref: BibleReference, verseText: string): Partial<BibleReference> {
+  if (!hasStrongTextualOverlap(ref.excerptFromLyrics, verseText)) return {};
+  return { proximity: "alta", confidence: "high" };
+}
+
 /**
  * The AI is instructed never to output verse text, but this is the actual
  * safety net: whatever the model claims about `verseText`/`verseTextAvailable`
@@ -151,13 +196,14 @@ export async function enrichBibleReferences(
   return Promise.all(
     references.map(async (ref) => {
       const curated = lookupVerse(ref.referenceLabel);
-      if (curated.found) {
+      if (curated.found && curated.text) {
         return {
           ...ref,
           verseText: curated.text,
           verseTextAvailable: true,
           translationUsed: curated.translation ?? ref.translationUsed,
           attribution: curated.attribution,
+          ...withOverlapBoost(ref, curated.text),
         };
       }
 
@@ -169,6 +215,7 @@ export async function enrichBibleReferences(
           verseTextAvailable: true,
           translationUsed: "Domínio público (base histórica Almeida)",
           attribution: BIBLE_DATASET_DISCLAIMER,
+          ...withOverlapBoost(ref, curatedByRange.text),
         };
       }
 
@@ -180,6 +227,7 @@ export async function enrichBibleReferences(
           verseTextAvailable: true,
           translationUsed: `abibliadigital.com.br (${external.version.toUpperCase()})`,
           attribution: EXTERNAL_ATTRIBUTION,
+          ...withOverlapBoost(ref, external.text),
         };
       }
 

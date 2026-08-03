@@ -100,6 +100,33 @@ describe("enrichBibleReferences", () => {
     expect(enriched.verseText).toContain("amou o mundo");
   });
 
+  it("promotes a reference to 'forte' (proximity alta, confidence high) when the lyric excerpt really shares vocabulary with the verse text", async () => {
+    const [enriched] = await enrichBibleReferences([
+      ref({
+        referenceLabel: "João 3:16",
+        excerptFromLyrics: "Deus amou o mundo de tal maneira",
+        proximity: "baixa",
+        confidence: "low",
+      }),
+    ]);
+    expect(enriched.proximity).toBe("alta");
+    expect(enriched.confidence).toBe("high");
+  });
+
+  it("keeps the AI's own (weaker) classification when the excerpt is only thematically related, not textually", async () => {
+    const [enriched] = await enrichBibleReferences([
+      ref({
+        referenceLabel: "João 3:16",
+        excerptFromLyrics: "Minha esperança está firmada em ti, meu Senhor",
+        proximity: "baixa",
+        confidence: "low",
+      }),
+    ]);
+    expect(enriched.proximity).toBe("baixa");
+    expect(enriched.confidence).toBe("low");
+    expect(enriched.verseTextAvailable).toBe(true);
+  });
+
   it("finds the curated text when the AI cites a specific verse that falls inside a curated range (e.g. Salmos 23:4 inside curated Salmos 23:1-4)", async () => {
     const [enriched] = await enrichBibleReferences([
       ref({ referenceLabel: "Salmos 23:4", book: "Salmos", chapterStart: 23, verseStart: 4 }),
