@@ -54,11 +54,7 @@ export function quickReviewToAIProducedAnalysis(q: QuickReview): AIProducedAnaly
   return {
     overview: {
       perceivedCentralMessage: q.resumo,
-      compositionType: "Revisão rápida",
-      mainEmotion: "Não avaliado na revisão rápida",
-      emotionalMovement: "Não avaliado na revisão rápida",
       likelyAudience: "Não avaliado na revisão rápida",
-      likelyUsageContext: "Não avaliado na revisão rápida",
       strengths: q.pontosFortes,
       attentionPoints: q.correcoesPrioritarias,
       consistencyWithStatedIntent: "nao_foi_possivel_determinar",
@@ -68,40 +64,12 @@ export function quickReviewToAIProducedAnalysis(q: QuickReview): AIProducedAnaly
     bibleReferences: [],
     biblicalContext: [],
     theologicalClaims: [],
-    coherence: {
-      messageAppearsClearly: true,
-      lyricalSubjectConsistent: true,
-      addresseeConsistent: true,
-      intensityTrend: "estatica",
-      unansweredQuestions: [],
-      narrativeMap: { structureType: "poetica" },
-      pointOfView: {
-        dominantPerson: "Não avaliado na revisão rápida.",
-        whoSpeaks: "Não avaliado na revisão rápida.",
-        toWhom: "Não avaliado na revisão rápida.",
-        shifts: [],
-      },
-    },
     grammarFindings: [],
-    compositionFindings: [],
-    chorusAnalysis: { present: false, candidatePhrases: [] },
-    rhymeFindings: [],
-    mood: {
-      perceivedFunctions: ["reflexiva"],
-      lyricalEmotions: ["contemplativa"],
-      textualEnergy: "constante",
-      movementDescription: "Não avaliado na revisão rápida.",
-      probableStyleHypotheses: [],
-      confidence: "low",
-      disclaimer:
-        "Esta classificação considera apenas a letra. Arranjo, melodia, harmonia, interpretação e produção podem alterar completamente a percepção musical.",
-    },
-    congregational: { applicable: false },
     composerQuestions: [],
     findings: [
       {
         id: "quick-suggestion",
-        category: "composition",
+        category: "theological",
         originalExcerpt: "(revisão rápida)",
         title: "Sugestão final",
         explanation: q.sugestaoFinal,

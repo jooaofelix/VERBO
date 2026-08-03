@@ -78,7 +78,6 @@ export function normalizeLegacyVersion(id: string, raw: unknown): WithId<Version
   const context: SongContextInput = {
     ...rawContext,
     theologicalTradition: rawContext.theologicalTradition ?? "nao_selecionar",
-    desiredChangeLevel: rawContext.desiredChangeLevel ?? "refinar_mantendo_voz",
     bibleReferencesProvidedByUser: Array.isArray(rawContext.bibleReferencesProvidedByUser)
       ? rawContext.bibleReferencesProvidedByUser
       : [],

@@ -98,17 +98,6 @@ export function ReportTab({ song, version, result }: Props) {
               ...report.attentionPoints,
             ]}
           />
-          <ReportBlock
-            title="Estrutura e composição"
-            items={[
-              `Estrutura: ${report.structureOverview}`,
-              `Classificação lírica: ${report.lyricalClassification}`,
-              `Emoção predominante: ${report.emotion}`,
-              ...report.compositionObservations,
-              ...report.productionObservations,
-            ]}
-          />
-          <ReportBlock title="Adequação congregacional" items={[report.congregationalFit]} />
           <ReportBlock title="Perguntas pendentes" items={report.pendingQuestions} />
           <ReportBlock title="Limitações" items={report.limitations} />
         </div>

@@ -5,7 +5,6 @@ describe("SongContextInputSchema", () => {
   it("accepts an entirely empty context (no field is mandatory)", () => {
     const parsed = SongContextInputSchema.parse({});
     expect(parsed.theologicalTradition).toBe("nao_selecionar");
-    expect(parsed.desiredChangeLevel).toBe("refinar_mantendo_voz");
   });
 });
 

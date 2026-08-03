@@ -1,13 +1,6 @@
 import type { AnalyzeRequest, RevisionMode, SongSection } from "@verbo/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  ALL_AREAS as AREAS,
-  areaJsonSchema,
-  type BiblicalAIShape,
-  type ComposicaoAIShape,
-  type CongregacionalAIShape,
-  type PortuguesAIShape,
-} from "./areas.js";
+import { ALL_AREAS as AREAS, areaJsonSchema, type BiblicalAIShape, type PortuguesAIShape } from "./areas.js";
 import { DemoAIProvider } from "./demoProvider.js";
 import { QUICK_JSON_SCHEMA, type QuickReview } from "./quickReview.js";
 import { AITimeoutError, ALL_AREAS, WorkersAIProvider } from "./workersAIProvider.js";
@@ -18,7 +11,6 @@ function baseRequest(mode: RevisionMode = "completa"): AnalyzeRequest {
     sections: [],
     context: {
       theologicalTradition: "nao_selecionar",
-      desiredChangeLevel: "refinar_mantendo_voz",
       bibleReferencesProvidedByUser: [],
     },
     revisionMode: mode,
@@ -68,29 +60,6 @@ function portuguesFixture(): PortuguesAIShape {
   };
 }
 
-function composicaoFixture(): ComposicaoAIShape {
-  return {
-    estrutura: "poetica",
-    classificacaoLirica: "reflexiva",
-    emocao: "contemplativa",
-    energiaTextual: "constante",
-    temaCentral: "A fidelidade de Deus em meio às dificuldades",
-    observacoesProducao: ["Funciona bem em arranjo acústico."],
-    pontosFortes: ["Refrão memorável."],
-    sugestoes: ["Considere expandir a ponte."],
-  };
-}
-
-function congregacionalFixture(): CongregacionalAIShape {
-  return {
-    adequacao: "Adequada para culto congregacional.",
-    facilidadeDeCanto: "Fácil de cantar em grupo.",
-    clarezaDaMensagem: "Mensagem clara para a congregação.",
-    pontosFortes: ["Repetição ajuda memorização."],
-    sugestoes: [],
-  };
-}
-
 function quickFixture(): QuickReview {
   return {
     resumo: "Resumo de teste",
@@ -106,10 +75,6 @@ function fixtureFor(area: (typeof AREAS)[number]) {
       return biblicalFixture();
     case "portugues":
       return portuguesFixture();
-    case "composicao":
-      return composicaoFixture();
-    case "congregacional":
-      return congregacionalFixture();
   }
 }
 
@@ -194,8 +159,8 @@ describe("WorkersAIProvider — revisão rápida", () => {
   });
 });
 
-describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
-  it("makes exactly four calls — one per area — each using JSON Schema mode", async () => {
+describe("WorkersAIProvider — revisão completa (2 area calls)", () => {
+  it("makes exactly two calls — one per area — each using JSON Schema mode", async () => {
     const run = vi.fn().mockImplementation(async (_model: string, options: RunOptions) => {
       return { response: fixtureFor(areaFromCall(options)) };
     });
@@ -208,18 +173,17 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
       prosody: [],
     });
 
-    expect(run).toHaveBeenCalledTimes(4);
+    expect(run).toHaveBeenCalledTimes(2);
     for (const call of run.mock.calls) {
       const [model, options] = call as [string, RunOptions];
       expect(options.response_format.type).toBe("json_schema");
       if (model === "@cf/meta/llama-3.1-8b-instruct-fast") {
         // "português" is the one area allowed to use the bigger model.
-        expect(options.max_tokens).toBeGreaterThanOrEqual(650);
-        expect(options.max_tokens).toBeLessThanOrEqual(850);
+        expect(options.max_tokens).toBe(950);
         expect(options.temperature).toBe(0.1);
       } else {
         expect(model).toBe("@cf/meta/llama-3.2-3b-instruct");
-        expect(options.max_tokens).toBe(500);
+        expect(options.max_tokens).toBe(750);
         expect(options.temperature).toBe(0.15);
       }
     }
@@ -241,26 +205,8 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
       prosody: [],
     });
 
-    // structure: composicao.estrutura "poetica" → "poética", used directly (no "Não determinado" prefix)
-    expect(result.overview.compositionType).toBe("poética");
-    expect(result.overview.compositionType).not.toMatch(/não determinado/i);
-
-    // emotion: composicao.emocao "contemplativa" preserved as-is
-    expect(result.overview.mainEmotion).toBe("contemplativa");
-    expect(result.mood.lyricalEmotions).toContain("contemplativa");
-
-    // textual energy: composicao.energiaTextual "constante" preserved
-    expect(result.mood.textualEnergy).toBe("constante");
-
-    // messagePerceived: biblical.mensagemPercebida takes priority when present
+    // messagePerceived: biblical.mensagemPercebida is the only source now.
     expect(result.overview.perceivedCentralMessage).toBe("Confiança em Deus mesmo em tempos difíceis.");
-
-    // productionNotes: composicao.observacoesProducao flows into movementDescription
-    expect(result.mood.movementDescription).toContain("arranjo acústico");
-
-    // congregationalFit-related fields
-    expect(result.congregational.clarity).toBe("Mensagem clara para a congregação.");
-    expect(result.congregational.singability).toBe("Fácil de cantar em grupo.");
 
     // bibleReferences: mapped from biblical.referenciasBiblicas
     expect(result.bibleReferences[0].referenceLabel).toBe("Lamentações 3:23");
@@ -268,18 +214,13 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
     expect(result.bibleReferences[0].chapterStart).toBe(3);
     expect(result.bibleReferences[0].verseStart).toBe(23);
 
-    // strengths: union across all four areas, deduplicated
+    // strengths: union across both areas, deduplicated
     expect(result.overview.strengths).toEqual(
-      expect.arrayContaining([
-        "Mensagem teológica clara.",
-        "Vocabulário simples e direto.",
-        "Refrão memorável.",
-        "Repetição ajuda memorização.",
-      ])
+      expect.arrayContaining(["Mensagem teológica clara.", "Vocabulário simples e direto."])
     );
   });
 
-  it("mensagem usa composition.temaCentral quando a seção bíblica falha", async () => {
+  it("mensagem cai no placeholder padrão quando a seção bíblica falha (não há mais outra área que a produza)", async () => {
     const run = vi.fn().mockImplementation(async (_model: string, options: RunOptions) => {
       const area = areaFromCall(options);
       if (area === "biblica_teologica") {
@@ -296,7 +237,9 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
       prosody: [],
     });
 
-    expect(result.overview.perceivedCentralMessage).toBe("A fidelidade de Deus em meio às dificuldades");
+    expect(result.overview.perceivedCentralMessage).toBe(
+      "Não foi possível determinar a mensagem central nesta análise."
+    );
     expect(result.sectionStatus.biblica_teologica.status).toBe("indisponivel");
   });
 
@@ -316,10 +259,10 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
     });
 
     expect(result.sectionStatus).toEqual({});
-    expect(result.overview.compositionType).toBe("poética");
+    expect(result.bibleReferences).toHaveLength(1);
   });
 
-  it("retries only the area that timed out, leaving the other three at one call each", async () => {
+  it("retries only the area that timed out, leaving the other one at one call", async () => {
     const callsPerArea = new Map<string, number>();
     const run = vi.fn().mockImplementation(async (_model: string, options: RunOptions) => {
       const area = areaFromCall(options);
@@ -339,11 +282,9 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
       prosody: [],
     });
 
-    expect(run).toHaveBeenCalledTimes(5);
+    expect(run).toHaveBeenCalledTimes(3);
     expect(callsPerArea.get("portugues")).toBe(2);
     expect(callsPerArea.get("biblica_teologica")).toBe(1);
-    expect(callsPerArea.get("composicao")).toBe(1);
-    expect(callsPerArea.get("congregacional")).toBe(1);
     expect(result.sectionStatus).toEqual({});
   });
 
@@ -368,15 +309,14 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
         mensagem: "Esta parte da análise demorou mais que o esperado. Tente novamente.",
       },
     });
-    // The areas that succeeded were not discarded.
+    // The area that succeeded was not discarded.
     expect(result.bibleReferences).toHaveLength(1);
-    expect(result.overview.compositionType).toBe("poética");
   });
 
   it("marca formato_invalido (não timeout) quando a resposta não é um JSON válido nas duas tentativas", async () => {
     const run = vi.fn().mockImplementation(async (_model: string, options: RunOptions) => {
       const area = areaFromCall(options);
-      if (area === "composicao") return { response: "isto não é um JSON de forma alguma" };
+      if (area === "biblica_teologica") return { response: "isto não é um JSON de forma alguma" };
       return { response: fixtureFor(area) };
     });
     const provider = new WorkersAIProvider({ run } as unknown as Ai);
@@ -389,7 +329,7 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
     });
 
     expect(result.sectionStatus).toEqual({
-      composicao: {
+      biblica_teologica: {
         status: "formato_invalido",
         mensagem: "A resposta desta seção não pôde ser processada.",
       },
@@ -399,18 +339,17 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
   it("preserva campos válidos de uma área mesmo quando outro campo dela é inválido", async () => {
     const run = vi.fn().mockImplementation(async (_model: string, options: RunOptions) => {
       const area = areaFromCall(options);
-      if (area === "composicao") {
-        // estrutura/classificacaoLirica/emocao are valid; energiaTextual has the wrong type.
+      if (area === "biblica_teologica") {
+        // mensagemPercebida/referenciasBiblicas/pontosFortes are valid; alertas has the wrong type.
         return {
           response: {
-            estrutura: "poetica",
-            classificacaoLirica: "reflexiva",
-            emocao: "contemplativa",
-            energiaTextual: 12345,
-            temaCentral: "Tema válido",
-            observacoesProducao: [],
+            mensagemPercebida: "Mensagem válida",
+            referenciasBiblicas: [],
+            observacoesTeologicas: [],
             pontosFortes: [],
-            sugestoes: [],
+            alertas: 12345,
+            consistenciaComReferenciaDoUsuario: "nao_foi_possivel_determinar",
+            explicacaoConsistenciaReferencia: "",
           },
         };
       }
@@ -426,11 +365,10 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
     });
 
     // Not marked unavailable — most fields were valid.
-    expect(result.sectionStatus.composicao).toBeUndefined();
-    expect(result.overview.compositionType).toBe("poética");
-    expect(result.overview.mainEmotion).toBe("contemplativa");
+    expect(result.sectionStatus.biblica_teologica).toBeUndefined();
+    expect(result.overview.perceivedCentralMessage).toBe("Mensagem válida");
     // Only the single bad field falls back to a safe default.
-    expect(result.mood.textualEnergy).toBe("constante");
+    expect(result.overview.attentionPoints).toEqual([]);
   });
 
   it("retries exactly once on a generic (non-timeout, non-format) error too, then marks it indisponível", async () => {
@@ -448,8 +386,8 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
       prosody: [],
     });
 
-    // One retry for the failing area (not a chain of retries): 4 areas + 1 retry = 5 calls, never a 5th area.
-    expect(run).toHaveBeenCalledTimes(5);
+    // One retry for the failing area (not a chain of retries): 2 areas + 1 retry = 3 calls, never a 3rd area.
+    expect(run).toHaveBeenCalledTimes(3);
     expect(result.sectionStatus).toEqual({
       biblica_teologica: {
         status: "indisponivel",
@@ -460,7 +398,7 @@ describe("WorkersAIProvider — revisão completa (4 area calls)", () => {
 });
 
 describe("WorkersAIProvider — individual review modes (one area)", () => {
-  it("makes exactly one call for the selected area, with max_tokens between 500 and 700", async () => {
+  it("makes exactly one call for the selected area, with max_tokens between 700 and 900", async () => {
     const run = vi.fn().mockImplementation(async (_model: string, options: RunOptions) => {
       return { response: fixtureFor(areaFromCall(options)) };
     });
@@ -475,15 +413,15 @@ describe("WorkersAIProvider — individual review modes (one area)", () => {
 
     expect(run).toHaveBeenCalledTimes(1);
     const options = run.mock.calls[0][1] as RunOptions;
-    expect(options.max_tokens).toBeGreaterThanOrEqual(500);
-    expect(options.max_tokens).toBeLessThanOrEqual(700);
+    expect(options.max_tokens).toBeGreaterThanOrEqual(700);
+    expect(options.max_tokens).toBeLessThanOrEqual(900);
     expect(result.bibleReferences).toHaveLength(1);
     expect(result.sectionStatus).toEqual({});
   });
 });
 
 describe("WorkersAIProvider — português: bigger model, isolated call, detailed corrections", () => {
-  it("uses llama-3.1-8b-instruct-fast with 650-850 tokens and temperature 0.1 for a single português call", async () => {
+  it("uses llama-3.1-8b-instruct-fast with 900-1000 tokens and temperature 0.1 for a single português call", async () => {
     const run = vi.fn().mockResolvedValue({ response: portuguesFixture() });
     const provider = new WorkersAIProvider({ run } as unknown as Ai);
 
@@ -497,8 +435,8 @@ describe("WorkersAIProvider — português: bigger model, isolated call, detaile
     expect(run).toHaveBeenCalledTimes(1);
     const [model, options] = run.mock.calls[0] as [string, RunOptions];
     expect(model).toBe("@cf/meta/llama-3.1-8b-instruct-fast");
-    expect(options.max_tokens).toBeGreaterThanOrEqual(650);
-    expect(options.max_tokens).toBeLessThanOrEqual(850);
+    expect(options.max_tokens).toBeGreaterThanOrEqual(900);
+    expect(options.max_tokens).toBeLessThanOrEqual(1000);
     expect(options.temperature).toBe(0.1);
     expect(result.grammarFindings).toHaveLength(1);
   });
@@ -688,11 +626,11 @@ describe("WorkersAIProvider — português: bigger model, isolated call, detaile
   it("never classifies the lyric as 'autoajuda' — corrects the label if a model ever produces it", async () => {
     const run = vi.fn().mockImplementation(async (_model: string, options: RunOptions) => {
       const area = areaFromCall(options);
-      if (area === "composicao") {
+      if (area === "biblica_teologica") {
         return {
           response: {
-            ...composicaoFixture(),
-            temaCentral: "Uma canção de autoajuda sobre superação pessoal",
+            ...biblicalFixture(),
+            mensagemPercebida: "Uma canção de autoajuda sobre superação pessoal",
           },
         };
       }
@@ -778,60 +716,6 @@ describe("WorkersAIProvider — Gemini as primary attempt for every area", () =>
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(run).not.toHaveBeenCalled();
     expect(result.bibleReferences).toHaveLength(1);
-  });
-
-  it("uses Gemini for composicao when a key is configured", async () => {
-    const fetchMock = mockGeminiFetchOnce(JSON.stringify(composicaoFixture()));
-    vi.stubGlobal("fetch", fetchMock);
-    const run = vi.fn();
-    const provider = new WorkersAIProvider({ run } as unknown as Ai, "fake-gemini-key");
-
-    const result = await provider.analyzeLyrics({
-      request: baseRequest("composicao"),
-      sections: sections(),
-      deterministicGrammar: [],
-      prosody: [],
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(run).not.toHaveBeenCalled();
-    expect(result.overview.compositionType).toBeTruthy();
-  });
-
-  it("uses Gemini for congregacional when a key is configured", async () => {
-    const fetchMock = mockGeminiFetchOnce(JSON.stringify(congregacionalFixture()));
-    vi.stubGlobal("fetch", fetchMock);
-    const run = vi.fn();
-    const provider = new WorkersAIProvider({ run } as unknown as Ai, "fake-gemini-key");
-
-    await provider.analyzeLyrics({
-      request: baseRequest("congregacional"),
-      sections: sections(),
-      deterministicGrammar: [],
-      prosody: [],
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(run).not.toHaveBeenCalled();
-  });
-
-  it("falls back to Workers AI for composicao/congregacional when Gemini fails, same safety net as the other areas", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) }))
-    );
-    const run = vi.fn().mockResolvedValue({ response: congregacionalFixture() });
-    const provider = new WorkersAIProvider({ run } as unknown as Ai, "fake-gemini-key");
-
-    const result = await provider.analyzeLyrics({
-      request: baseRequest("congregacional"),
-      sections: sections(),
-      deterministicGrammar: [],
-      prosody: [],
-    });
-
-    expect(run).toHaveBeenCalledTimes(1);
-    expect(result.sectionStatus).toEqual({});
   });
 
   it("falls back to the Workers AI retry (3B model) when Gemini fails, instead of failing the whole area", async () => {

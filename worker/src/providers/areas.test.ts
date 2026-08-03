@@ -16,7 +16,6 @@ function baseRequest(bibleReferencesProvidedByUser: string[] = []): AnalyzeReque
     sections: [],
     context: {
       theologicalTradition: "nao_selecionar",
-      desiredChangeLevel: "refinar_mantendo_voz",
       bibleReferencesProvidedByUser,
     },
     revisionMode: "completa",
@@ -252,34 +251,22 @@ describe("areaUserPayload — Gemini gets a richer, higher-capacity prompt", () 
 
   it("uses the terse default focus for português by default", () => {
     const payload = areaUserPayload("portugues", sections);
-    expect(payload).toContain("no máximo 6 problemas");
+    expect(payload).toContain("no máximo 8 problemas");
   });
 
   it("uses a richer, higher-cap focus for português when the 'gemini' variant is requested", () => {
     const payload = areaUserPayload("portugues", sections, "gemini");
-    expect(payload).toContain("até 10 problemas reais");
+    expect(payload).toContain("até 12 problemas reais");
     expect(payload).toContain("pelo menos duas frases específicas");
   });
 
-  it("asks Gemini for 2-3 biblical references with a two-part explanation, unlike the default focus", () => {
+  it("asks Gemini to identify several biblical references in real historical/literary context, unlike the default focus", () => {
     const defaultPayload = areaUserPayload("biblica_teologica", sections);
     const geminiPayload = areaUserPayload("biblica_teologica", sections, "gemini");
 
-    expect(defaultPayload).not.toContain("2 ou 3 referências");
-    expect(geminiPayload).toContain("2 ou 3 referências");
-    expect(geminiPayload).toContain("pelo menos duas frases específicas");
-  });
-
-  it("gives composicao and congregacional richer, more specific prompts too, since Gemini now covers every area", () => {
-    const defaultComposicao = areaUserPayload("composicao", sections);
-    const geminiComposicao = areaUserPayload("composicao", sections, "gemini");
-    expect(geminiComposicao).not.toBe(defaultComposicao);
-    expect(geminiComposicao).toContain("duas ou três observações específicas");
-
-    const defaultCongregacional = areaUserPayload("congregacional", sections);
-    const geminiCongregacional = areaUserPayload("congregacional", sections, "gemini");
-    expect(geminiCongregacional).not.toBe(defaultCongregacional);
-    expect(geminiCongregacional).toContain("pelo menos duas frases específicas");
+    expect(defaultPayload).not.toContain("de 3 a 5 referências");
+    expect(geminiPayload).toContain("de 3 a 5 referências");
+    expect(geminiPayload).toContain("contexto histórico e literário");
   });
 });
 
@@ -294,7 +281,7 @@ describe("areaUserPayload / areaRetryUserPayload — user-provided base verse(s)
   });
 
   it("does not add consistency instructions to unrelated areas even when references are provided", () => {
-    const payload = areaUserPayload("composicao", sections, "padrao", [
+    const payload = areaUserPayload("portugues", sections, "padrao", [
       { label: "João 3:16", text: "Porque Deus amou o mundo..." },
     ]);
     expect(payload).not.toContain("consistenciaComReferenciaDoUsuario");

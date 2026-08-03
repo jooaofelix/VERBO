@@ -18,7 +18,6 @@ export class DemoAIProvider implements AIAnalysisProvider {
 
   async analyzeLyrics(input: LyricsAnalysisInput): Promise<AIProducedAnalysis> {
     const firstSectionId = input.sections[0]?.id ?? "sec-1";
-    const chorus = input.sections.find((s) => s.type === "refrao");
     const lineCount = input.sections.reduce((n, s) => n + s.text.split("\n").length, 0);
 
     const result: AIProducedAnalysis = {
@@ -26,12 +25,7 @@ export class DemoAIProvider implements AIAnalysisProvider {
         perceivedCentralMessage:
           "[Exemplo de demonstração] A letra parece expressar confiança em Deus em meio a uma " +
           "situação difícil, caminhando de um cenário de tensão para uma declaração de descanso.",
-        compositionType: "Declaração de fé com tom devocional (exemplo)",
-        mainEmotion: "Esperança",
-        emotionalMovement: "De inquietação inicial para confiança crescente",
         likelyAudience: input.request.context.intendedAudience || "Público geral cristão (estimativa de exemplo)",
-        likelyUsageContext:
-          input.request.context.usageContext ?? "Não informado pelo compositor — exemplo genérico",
         strengths: [
           "[Exemplo] O refrão comunica uma ideia central de forma direta.",
           "[Exemplo] A progressão emocional entre as seções é perceptível.",
@@ -46,70 +40,7 @@ export class DemoAIProvider implements AIAnalysisProvider {
       bibleReferences: [],
       biblicalContext: [],
       theologicalClaims: [],
-      coherence: {
-        messageAppearsClearly: true,
-        lyricalSubjectConsistent: true,
-        addresseeConsistent: true,
-        intensityTrend: "crescente",
-        unansweredQuestions: [],
-        narrativeMap: {
-          startingPoint: "[Exemplo] Situação de tensão ou dúvida.",
-          conflictOrTension: "[Exemplo] Incerteza diante de uma dificuldade.",
-          development: "[Exemplo] Lembrança de promessas ou experiências passadas.",
-          response: "[Exemplo] Decisão de confiar.",
-          conclusion: "[Exemplo] Declaração de descanso/confiança.",
-          structureType: "declarativa",
-        },
-        pointOfView: {
-          dominantPerson: "Primeira pessoa do singular",
-          whoSpeaks: "O eu lírico / compositor",
-          toWhom: "Deus (oração) — estimativa de exemplo",
-          shifts: [],
-        },
-      },
       grammarFindings: [],
-      compositionFindings: [
-        {
-          id: "demo-comp-1",
-          aspect: "impacto_do_refrao",
-          sectionId: chorus?.id ?? firstSectionId,
-          observation:
-            "[Exemplo] Em uma análise real, este campo comentaria se o refrão resume bem a mensagem central.",
-          isStrength: true,
-        },
-      ],
-      chorusAnalysis: {
-        present: Boolean(chorus),
-        summarizesMessage: Boolean(chorus),
-        memorable: Boolean(chorus),
-        candidatePhrases: chorus
-          ? [
-              {
-                text: chorus.text.split("\n")[0]?.trim() || "(primeira linha do refrão)",
-                function: "centro_emocional",
-              },
-            ]
-          : [],
-        notes: chorus
-          ? "[Exemplo] Refrão identificado pela repetição textual."
-          : "[Exemplo] Nenhum refrão claro foi identificado na divisão de seções atual.",
-      },
-      rhymeFindings: [],
-      mood: {
-        perceivedFunctions: ["devocional"],
-        lyricalEmotions: ["esperancosa", "confessional"],
-        textualEnergy: "crescente",
-        movementDescription: "[Exemplo] Energia textual crescente ao longo da letra.",
-        probableStyleHypotheses: ["Worship contemporâneo (hipótese de exemplo)"],
-        confidence: "low",
-        disclaimer:
-          "Esta classificação considera apenas a letra. Arranjo, melodia, harmonia, interpretação e produção podem alterar completamente a percepção musical.",
-      },
-      congregational: {
-        applicable: input.request.context.usageContext === "congregacional",
-        clarity: "[Exemplo] Comentário sobre clareza para canto coletivo apareceria aqui.",
-        notes: "Resultado de exemplo — não reflete a letra enviada.",
-      },
       composerQuestions: [
         {
           id: "demo-q-1",
@@ -120,12 +51,12 @@ export class DemoAIProvider implements AIAnalysisProvider {
       findings: [
         {
           id: "demo-finding-1",
-          category: "composition",
+          category: "theological",
           sectionId: firstSectionId,
           originalExcerpt: input.sections[0]?.text.split("\n")[0]?.trim() ?? "(primeira linha)",
-          title: "[Exemplo] Ponto forte de abertura",
+          title: "[Exemplo] Observação teológica de abertura",
           explanation:
-            "Em modo demonstração, este cartão mostraria uma observação real sobre a primeira linha da letra.",
+            "Em modo demonstração, este cartão mostraria uma observação teológica real sobre a primeira linha da letra.",
           confidence: "low",
           severity: "observation",
           requiresUserContext: false,

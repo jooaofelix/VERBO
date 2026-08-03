@@ -17,7 +17,7 @@ const CONSISTENCY_CLASS: Record<AnalysisResult["overview"]["consistencyWithState
 };
 
 export function OverviewTab({ result }: { result: AnalysisResult }) {
-  const { overview, mood } = result;
+  const { overview } = result;
 
   return (
     <div className="flex flex-col gap-5">
@@ -37,29 +37,9 @@ export function OverviewTab({ result }: { result: AnalysisResult }) {
       <dl className="grid gap-3 sm:grid-cols-2">
         <div>
           <dt className="text-xs font-medium uppercase text-ink-700/50 dark:text-parchment-100/40">
-            Tipo de composição
+            Público provável
           </dt>
-          <dd className="text-sm">{overview.compositionType}</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium uppercase text-ink-700/50 dark:text-parchment-100/40">
-            Emoção principal
-          </dt>
-          <dd className="text-sm">{overview.mainEmotion}</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium uppercase text-ink-700/50 dark:text-parchment-100/40">
-            Movimento emocional
-          </dt>
-          <dd className="text-sm">{overview.emotionalMovement}</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium uppercase text-ink-700/50 dark:text-parchment-100/40">
-            Público / contexto prováveis
-          </dt>
-          <dd className="text-sm">
-            {overview.likelyAudience} — {overview.likelyUsageContext}
-          </dd>
+          <dd className="text-sm">{overview.likelyAudience}</dd>
         </div>
       </dl>
 
@@ -84,20 +64,6 @@ export function OverviewTab({ result }: { result: AnalysisResult }) {
             </ul>
           )}
         </div>
-      </div>
-
-      <div className="rounded-lg border border-ink-800/10 p-3 text-sm dark:border-parchment-50/10">
-        <p className="font-medium">Classificação (baseada apenas na letra)</p>
-        <p className="mt-1 text-ink-700/80 dark:text-parchment-100/70">
-          Funções: {mood.perceivedFunctions.join(", ")} · Emoções: {mood.lyricalEmotions.join(", ")} ·
-          Energia textual: {mood.textualEnergy}
-        </p>
-        {mood.probableStyleHypotheses.length > 0 && (
-          <p className="mt-1 text-ink-700/80 dark:text-parchment-100/70">
-            Hipóteses de estilo: {mood.probableStyleHypotheses.join(", ")}
-          </p>
-        )}
-        <p className="mt-2 text-xs text-ink-700/50 dark:text-parchment-100/40">{mood.disclaimer}</p>
       </div>
     </div>
   );

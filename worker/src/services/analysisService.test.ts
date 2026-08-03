@@ -14,7 +14,6 @@ function request(overrides: Partial<AnalyzeRequest> = {}): AnalyzeRequest {
     sections: [],
     context: {
       theologicalTradition: "nao_selecionar",
-      desiredChangeLevel: "refinar_mantendo_voz",
       bibleReferencesProvidedByUser: [],
     },
     revisionMode: "completa",

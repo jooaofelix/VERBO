@@ -65,7 +65,6 @@ export function ProjectView() {
         sections: source?.sections ?? [],
         context: source?.context ?? {
           theologicalTradition: "nao_selecionar",
-          desiredChangeLevel: "refinar_mantendo_voz",
           bibleReferencesProvidedByUser: [],
         },
         sourceVersionId: source?.id,

@@ -10,17 +10,14 @@ import { useAuth } from "../hooks/useAuth.js";
 import { analyzeLyrics } from "../services/worker/client.js";
 
 const REVISION_MODES: Array<{ value: RevisionMode; label: string; description: string }> = [
-  { value: "completa", label: "Revisão completa", description: "Combina todas as análises abaixo." },
+  { value: "completa", label: "Revisão completa", description: "Bíblica/contexto + português, com toda a profundidade." },
   { value: "rapida", label: "Revisão rápida", description: "Mensagem, referências, erros e 3 sugestões prioritárias." },
-  { value: "biblica_teologica", label: "Bíblica e teológica", description: "Referências, contexto, doutrina e tradições." },
-  { value: "composicao", label: "Composição", description: "Estrutura, refrão, narrativa, métrica e rimas." },
-  { value: "portugues", label: "Português", description: "Ortografia, gramática, conjugação e clareza." },
-  { value: "congregacional", label: "Congregacional", description: "Clareza coletiva, cantabilidade e repetição." },
+  { value: "biblica_teologica", label: "Só bíblica e de contexto", description: "Referências, contexto histórico e teológico." },
+  { value: "portugues", label: "Só português", description: "Ortografia, gramática, conjugação e concordância." },
 ];
 
 const DEFAULT_CONTEXT: SongContextInput = {
   theologicalTradition: "nao_selecionar",
-  desiredChangeLevel: "refinar_mantendo_voz",
   bibleReferencesProvidedByUser: [],
   isChristian: true,
 };
@@ -53,7 +50,7 @@ export function NewAnalysis() {
       const songId = await createSong(user.uid, {
         title,
         author: author || undefined,
-        congregational: context.usageContext === "congregacional",
+        congregational: false,
         hasAudio: false,
       });
 

@@ -48,25 +48,19 @@ export const CATEGORY_LABEL: Record<HighlightCategory, string> = {
   biblical: "Referência bíblica",
   theological: "Teologia",
   grammar: "Português",
-  composition: "Composição",
   artistic_choice: "Escolha artística",
-  congregational: "Congregacional",
 };
 
 export const CATEGORY_DOT_CLASS: Record<HighlightCategory, string> = {
   biblical: "bg-blue-500",
   theological: "bg-violet-500",
   grammar: "bg-rose-500",
-  composition: "bg-emerald-500",
   artistic_choice: "bg-slate-400",
-  congregational: "bg-amber-500",
 };
 
 export const CATEGORY_MARK_CLASS: Record<HighlightCategory, string> = {
   biblical: "bg-blue-500/20 decoration-blue-500",
   theological: "bg-violet-500/20 decoration-violet-500",
   grammar: "bg-rose-500/20 decoration-rose-500",
-  composition: "bg-emerald-500/20 decoration-emerald-500",
   artistic_choice: "bg-slate-400/20 decoration-slate-400",
-  congregational: "bg-amber-500/20 decoration-amber-500",
 };

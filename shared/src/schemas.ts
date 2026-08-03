@@ -15,14 +15,7 @@ export const FindingSeveritySchema = z.enum([
   "theological_discussion",
 ]);
 
-export const HighlightCategorySchema = z.enum([
-  "biblical",
-  "theological",
-  "grammar",
-  "composition",
-  "artistic_choice",
-  "congregational",
-]);
+export const HighlightCategorySchema = z.enum(["biblical", "theological", "grammar", "artistic_choice"]);
 
 export const SectionStatusValueSchema = z.object({
   status: z.enum(["ok", "timeout", "formato_invalido", "indisponivel"]),
@@ -231,58 +224,6 @@ export const GrammarFindingSchema = z.object({
   source: z.enum(["deterministico", "ia", "languagetool"]).default("ia"),
 });
 
-export const CompositionAspectSchema = z.enum([
-  "primeira_frase",
-  "clareza_do_tema",
-  "desenvolvimento_dos_versos",
-  "preparacao_pre_refrao",
-  "impacto_do_refrao",
-  "memorabilidade",
-  "relacao_titulo_refrao",
-  "uso_de_repeticao",
-  "contraste_entre_secoes",
-  "funcao_da_ponte",
-  "encerramento",
-  "quantidade_de_informacao",
-  "cliche",
-  "imagem_original",
-  "campo_semantico",
-  "unidade_poetica",
-  "funcao_de_secao_ausente",
-]);
-
-export const CompositionFindingSchema = z.object({
-  id: z.string(),
-  aspect: CompositionAspectSchema,
-  sectionId: z.string().optional(),
-  observation: z.string(),
-  isStrength: z.boolean(),
-  suggestion: z.string().optional(),
-});
-
-export const ChorusCandidatePhraseSchema = z.object({
-  text: z.string(),
-  function: z.enum(["titulo", "gancho", "centro_emocional", "centro_teologico"]),
-});
-
-export const ChorusAnalysisSchema = z.object({
-  present: z.boolean(),
-  summarizesMessage: z.boolean().optional(),
-  memorable: z.boolean().optional(),
-  hasCentralPhrase: z.boolean().optional(),
-  titleAppears: z.boolean().optional(),
-  standsAlone: z.boolean().optional(),
-  strongerThanVerses: z.boolean().optional(),
-  tooAbstract: z.boolean().optional(),
-  tooMuchInformation: z.boolean().optional(),
-  easyToRepeat: z.boolean().optional(),
-  fitsIntendedMood: z.boolean().optional(),
-  goodForCollectiveSinging: z.boolean().optional(),
-  repetitionStrengthensMessage: z.boolean().optional(),
-  candidatePhrases: z.array(ChorusCandidatePhraseSchema).default([]),
-  notes: z.string().optional(),
-});
-
 export const ProsodyFindingSchema = z.object({
   id: z.string(),
   sectionId: z.string().optional(),
@@ -292,165 +233,6 @@ export const ProsodyFindingSchema = z.object({
   difficultConsonantClusters: z.array(z.string()).default([]),
   vowelSequences: z.array(z.string()).default([]),
   fluencyNote: z.string(),
-});
-
-export const RhymeTypeSchema = z.enum([
-  "perfeita",
-  "imperfeita",
-  "interna",
-  "assonancia",
-  "aliteracao",
-  "ausente",
-  "previsivel",
-  "forcada",
-  "altera_mensagem",
-]);
-
-export const RhymeFindingSchema = z.object({
-  id: z.string(),
-  lines: z.array(z.string()),
-  type: RhymeTypeSchema,
-  note: z.string(),
-});
-
-export const SongFunctionSchema = z.enum([
-  "congregacional",
-  "devocional",
-  "artistica",
-  "testemunhal",
-  "evangelistica",
-  "liturgica",
-  "narrativa",
-  "reflexiva",
-  "exortativa",
-  "oracao_cantada",
-  "declaracao_de_fe",
-  "celebracao",
-  "lamento",
-]);
-
-export const LyricalEmotionSchema = z.enum([
-  "alegre",
-  "esperancosa",
-  "intensa",
-  "contemplativa",
-  "melancolica",
-  "vulneravel",
-  "triunfante",
-  "reverente",
-  "epica",
-  "intima",
-  "confessional",
-  "tensa",
-  "serena",
-  "celebrativa",
-]);
-
-export const TextualEnergySchema = z.enum([
-  "baixa",
-  "media",
-  "alta",
-  "crescente",
-  "decrescente",
-  "constante",
-  "contrastante",
-]);
-
-export const MoodAnalysisSchema = z.object({
-  perceivedFunctions: z.array(SongFunctionSchema).min(1),
-  lyricalEmotions: z.array(LyricalEmotionSchema).min(1),
-  textualEnergy: TextualEnergySchema,
-  movementDescription: z.string(),
-  probableStyleHypotheses: z.array(z.string()).default([]),
-  confidence: ConfidenceLevelSchema,
-  disclaimer: z
-    .string()
-    .default(
-      "Esta classificação considera apenas a letra. Arranjo, melodia, harmonia, interpretação e produção podem alterar completamente a percepção musical."
-    ),
-});
-
-export const CongregationalAnalysisSchema = z.object({
-  applicable: z.boolean(),
-  clarity: z.string().optional(),
-  godCenteredness: z.string().optional(),
-  comprehensionWithoutExplanation: z.string().optional(),
-  memorization: z.string().optional(),
-  repetitionNote: z.string().optional(),
-  lineLength: z.string().optional(),
-  vocabulary: z.string().optional(),
-  theologicalTermsUsage: z.string().optional(),
-  individualVsCollectivePerspective: z.string().optional(),
-  singability: z.string().optional(),
-  wordsPerLine: z.string().optional(),
-  vocalInterpretationDependency: z.string().optional(),
-  needsComposerBackstory: z.boolean().optional(),
-  ambiguityWhenSungByCommunity: z.string().optional(),
-  personalVsSharedTruthBalance: z.string().optional(),
-  simplicityVsDensityNote: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-export const NarrativeStructureTypeSchema = z.enum([
-  "narrativa",
-  "circular",
-  "contemplativa",
-  "declarativa",
-  "liturgica",
-  "confessional",
-  "poetica",
-  "exortativa",
-  "testemunhal",
-]);
-
-export const NarrativeMapSchema = z.object({
-  startingPoint: z.string().optional(),
-  conflictOrTension: z.string().optional(),
-  development: z.string().optional(),
-  revelation: z.string().optional(),
-  response: z.string().optional(),
-  conclusion: z.string().optional(),
-  structureType: NarrativeStructureTypeSchema,
-});
-
-export const PointOfViewShiftSchema = z.object({
-  fromSectionId: z.string().optional(),
-  toSectionId: z.string().optional(),
-  from: z.string(),
-  to: z.string(),
-  note: z.string(),
-});
-
-export const PointOfViewSchema = z.object({
-  dominantPerson: z.string(),
-  whoSpeaks: z.string(),
-  toWhom: z.string(),
-  aboutWhom: z.string().optional(),
-  shifts: z.array(PointOfViewShiftSchema).default([]),
-});
-
-export const IntensityTrendSchema = z.enum([
-  "crescente",
-  "decrescente",
-  "estatica",
-  "irregular",
-]);
-
-export const CoherenceAnalysisSchema = z.object({
-  messageAppearsClearly: z.boolean(),
-  chorusRepresentsCentralIdea: z.boolean().optional(),
-  versesDevelopMessage: z.boolean().optional(),
-  bridgeAddsOrRepeats: z.enum(["acrescenta", "repete", "nao_ha_ponte"]).optional(),
-  endingDeliversPayoff: z.boolean().optional(),
-  topicShiftDetected: z.string().optional(),
-  contradictionDetected: z.string().optional(),
-  lyricalSubjectConsistent: z.boolean(),
-  addresseeConsistent: z.boolean(),
-  intensityTrend: IntensityTrendSchema,
-  unansweredQuestions: z.array(z.string()).default([]),
-  mainImageDeveloped: z.boolean().optional(),
-  narrativeMap: NarrativeMapSchema,
-  pointOfView: PointOfViewSchema,
 });
 
 export const ConsistencyLevelSchema = z.enum([
@@ -463,11 +245,7 @@ export const ConsistencyLevelSchema = z.enum([
 
 export const OverviewSummarySchema = z.object({
   perceivedCentralMessage: z.string(),
-  compositionType: z.string(),
-  mainEmotion: z.string(),
-  emotionalMovement: z.string(),
   likelyAudience: z.string(),
-  likelyUsageContext: z.string(),
   strengths: z.array(z.string()).min(1),
   attentionPoints: z.array(z.string()).default([]),
   consistencyWithStatedIntent: ConsistencyLevelSchema,
@@ -481,14 +259,7 @@ export const ComposerQuestionSchema = z.object({
   relatedSectionId: z.string().optional(),
 });
 
-export const RevisionModeSchema = z.enum([
-  "rapida",
-  "biblica_teologica",
-  "composicao",
-  "portugues",
-  "congregacional",
-  "completa",
-]);
+export const RevisionModeSchema = z.enum(["rapida", "biblica_teologica", "portugues", "completa"]);
 
 export const TheologicalTraditionSchema = z.enum([
   "geral",
@@ -504,14 +275,6 @@ export const TheologicalTraditionSchema = z.enum([
   "nao_selecionar",
 ]);
 
-export const DesiredChangeLevelSchema = z.enum([
-  "apontar_problemas",
-  "pequenas_correcoes",
-  "refinar_mantendo_voz",
-  "mudancas_criativas",
-  "versao_alternativa_completa",
-]);
-
 export const SongContextInputSchema = z.object({
   centralMessage: z.string().optional(),
   desiredUnderstanding: z.string().optional(),
@@ -525,25 +288,11 @@ export const SongContextInputSchema = z.object({
     .optional(),
   isChristian: z.boolean().optional(),
   isExplicitlyBiblical: z.boolean().optional(),
-  usageContext: z
-    .enum([
-      "culto",
-      "congregacional",
-      "artistica_lancamento",
-      "devocional",
-      "evangelizacao",
-      "criancas",
-      "outro",
-      "nao_sei",
-    ])
-    .optional(),
   intendedAudience: z.string().optional(),
   theologicalTradition: TheologicalTraditionSchema.default("nao_selecionar"),
-  intendedStyle: z.string().optional(),
   intendedMood: z.string().optional(),
   hasReferenceTrack: z.boolean().optional(),
   bibleReferencesProvidedByUser: z.array(z.string()).default([]),
-  desiredChangeLevel: DesiredChangeLevelSchema.default("refinar_mantendo_voz"),
 });
 
 export const AnalyzeRequestSchema = z.object({
@@ -571,16 +320,10 @@ export const FinalReportSchema = z.object({
   /** "Sugestões de reescrita" — concrete alternative phrasings pulled out of the line-by-line review. */
   rewriteSuggestions: z.array(z.string()).default([]),
   perceivedMessage: z.string(),
-  structureOverview: z.string(),
-  lyricalClassification: z.string(),
-  emotion: z.string(),
   bibleReferences: z.array(BibleReferenceSchema).default([]),
   biblicalContextNotes: z.array(z.string()).default([]),
   theologicalObservations: z.array(z.string()).default([]),
   linguisticObservations: z.array(z.string()).default([]),
-  compositionObservations: z.array(z.string()).default([]),
-  productionObservations: z.array(z.string()).default([]),
-  congregationalFit: z.string(),
   strengths: z.array(z.string()).default([]),
   attentionPoints: z.array(z.string()).default([]),
   pendingQuestions: z.array(z.string()).default([]),
@@ -598,25 +341,19 @@ export const AnalysisResultSchema = z.object({
   bibleReferences: z.array(BibleReferenceSchema).default([]),
   biblicalContext: z.array(BiblicalContextAnalysisSchema).default([]),
   theologicalClaims: z.array(TheologicalClaimSchema).default([]),
-  coherence: CoherenceAnalysisSchema,
   grammarFindings: z.array(GrammarFindingSchema).default([]),
-  compositionFindings: z.array(CompositionFindingSchema).default([]),
-  chorusAnalysis: ChorusAnalysisSchema,
   prosodyFindings: z.array(ProsodyFindingSchema).default([]),
-  rhymeFindings: z.array(RhymeFindingSchema).default([]),
-  mood: MoodAnalysisSchema,
-  congregational: CongregationalAnalysisSchema,
   composerQuestions: z.array(ComposerQuestionSchema).default([]),
   findings: z.array(AnalysisFindingSchema).default([]),
   limitations: z.array(z.string()).default([]),
   disclaimers: z.array(z.string()).default([]),
   /**
    * Per-area availability for revisionMode "completa" (and the individual
-   * area modes), keyed by area ("biblica_teologica" | "portugues" |
-   * "composicao" | "congregacional"). Only areas that could not be produced
-   * in time appear here — a fully successful analysis has an empty object.
-   * Lets the UI show a partial report instead of failing outright when one
-   * area of a multi-call analysis times out.
+   * area modes), keyed by area ("biblica_teologica" | "portugues"). Only
+   * areas that could not be produced in time appear here — a fully
+   * successful analysis has an empty object. Lets the UI show a partial
+   * report instead of failing outright when one area of a multi-call
+   * analysis times out.
    */
   sectionStatus: z.record(z.string(), SectionStatusValueSchema).default({}),
   /** Up to 5 concrete, actionable fixes, ordered by priority — "O que corrigir primeiro". */
@@ -639,13 +376,7 @@ export const AIProducedAnalysisSchema = z.object({
   bibleReferences: z.array(BibleReferenceSchema).default([]),
   biblicalContext: z.array(BiblicalContextAnalysisSchema).default([]),
   theologicalClaims: z.array(TheologicalClaimSchema).default([]),
-  coherence: CoherenceAnalysisSchema,
   grammarFindings: z.array(GrammarFindingSchema).default([]),
-  compositionFindings: z.array(CompositionFindingSchema).default([]),
-  chorusAnalysis: ChorusAnalysisSchema,
-  rhymeFindings: z.array(RhymeFindingSchema).default([]),
-  mood: MoodAnalysisSchema,
-  congregational: CongregationalAnalysisSchema,
   composerQuestions: z.array(ComposerQuestionSchema).default([]),
   findings: z.array(AnalysisFindingSchema).default([]),
   limitations: z.array(z.string()).default([]),

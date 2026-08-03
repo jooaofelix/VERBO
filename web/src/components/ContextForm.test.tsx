@@ -6,13 +6,12 @@ import { ContextForm } from "./ContextForm.js";
 function baseValue(overrides: Partial<SongContextInput> = {}): SongContextInput {
   return {
     theologicalTradition: "nao_selecionar",
-    desiredChangeLevel: "refinar_mantendo_voz",
     bibleReferencesProvidedByUser: [],
     ...overrides,
   };
 }
 
-describe("ContextForm — click-first fields (público, estilo, humor)", () => {
+describe("ContextForm — click-first fields (público, humor)", () => {
   it("sets the value by clicking a preset chip, no typing required", () => {
     const onChange = vi.fn();
     render(<ContextForm value={baseValue()} onChange={onChange} />);
@@ -28,8 +27,8 @@ describe("ContextForm — click-first fields (público, estilo, humor)", () => {
   });
 
   it("keeps the custom text input visible (pre-filled) when the current value isn't one of the presets", () => {
-    render(<ContextForm value={baseValue({ intendedStyle: "MPB cristã" })} onChange={vi.fn()} />);
-    expect(screen.getByDisplayValue("MPB cristã")).toBeInTheDocument();
+    render(<ContextForm value={baseValue({ intendedMood: "Nostálgica" })} onChange={vi.fn()} />);
+    expect(screen.getByDisplayValue("Nostálgica")).toBeInTheDocument();
   });
 });
 

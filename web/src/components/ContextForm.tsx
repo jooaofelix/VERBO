@@ -197,22 +197,6 @@ export function ContextForm({ value, onChange }: Props) {
           </select>
         </Field>
 
-        <Field label="Contexto de uso pretendido">
-          <select
-            className={inputClass}
-            value={value.usageContext ?? "nao_sei"}
-            onChange={(e) => onChange({ usageContext: e.target.value as SongContextInput["usageContext"] })}
-          >
-            <option value="nao_sei">Não sei / prefiro não dizer</option>
-            <option value="culto">Culto</option>
-            <option value="congregacional">Música congregacional</option>
-            <option value="artistica_lancamento">Música artística / lançamento</option>
-            <option value="devocional">Devocional</option>
-            <option value="evangelizacao">Evangelização</option>
-            <option value="criancas">Público infantil</option>
-            <option value="outro">Outro</option>
-          </select>
-        </Field>
         <Field label="Tradição teológica para a análise">
           <select
             className={inputClass}
@@ -234,38 +218,15 @@ export function ContextForm({ value, onChange }: Props) {
             <option value="outra">Outra</option>
           </select>
         </Field>
-
-        <Field label="Quanto você deseja que o sistema altere?">
-          <select
-            className={inputClass}
-            value={value.desiredChangeLevel}
-            onChange={(e) =>
-              onChange({ desiredChangeLevel: e.target.value as SongContextInput["desiredChangeLevel"] })
-            }
-          >
-            <option value="apontar_problemas">Apenas apontar problemas</option>
-            <option value="pequenas_correcoes">Sugerir pequenas correções</option>
-            <option value="refinar_mantendo_voz">Refinar mantendo minha voz</option>
-            <option value="mudancas_criativas">Propor mudanças criativas</option>
-            <option value="versao_alternativa_completa">Criar uma versão alternativa completa</option>
-          </select>
-        </Field>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <ChipChoice
           label="Público pretendido"
           presets={["Jovens", "Adultos", "Todos os públicos", "Público infantil", "Igreja local"]}
           value={value.intendedAudience ?? ""}
           onChange={(v) => onChange({ intendedAudience: v })}
           placeholder="Descreva o público"
-        />
-        <ChipChoice
-          label="Estilo musical imaginado"
-          presets={["Worship contemporâneo", "Hino tradicional", "Gospel", "Balada", "Folk/acústico", "Rock cristão"]}
-          value={value.intendedStyle ?? ""}
-          onChange={(v) => onChange({ intendedStyle: v })}
-          placeholder="Descreva o estilo"
         />
         <ChipChoice
           label="Humor/emoção pretendida"

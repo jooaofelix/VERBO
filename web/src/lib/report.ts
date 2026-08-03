@@ -32,7 +32,6 @@ function describeIntent(version: WithId<VersionDoc>): string {
   const parts: string[] = [];
   if (c.centralMessage) parts.push(`Mensagem central: ${c.centralMessage}`);
   if (c.desiredUnderstanding) parts.push(`O que deseja comunicar: ${c.desiredUnderstanding}`);
-  if (c.usageContext) parts.push(`Contexto de uso: ${c.usageContext}`);
   if (c.intendedAudience) parts.push(`Público: ${c.intendedAudience}`);
   if (c.theologicalTradition && c.theologicalTradition !== "nao_selecionar") {
     parts.push(`Tradição: ${c.theologicalTradition}`);
@@ -61,9 +60,6 @@ export function buildFinalReport(
     narrativeConsistencyNotes: result.narrativeConsistencyIssues,
     rewriteSuggestions: rewriteSuggestionsFor(result.grammarFindings),
     perceivedMessage: result.overview.perceivedCentralMessage,
-    structureOverview: result.overview.compositionType,
-    lyricalClassification: result.mood.perceivedFunctions.join(", "),
-    emotion: result.overview.mainEmotion,
     bibleReferences: result.bibleReferences,
     biblicalContextNotes: result.biblicalContext.map(
       (c) => `${c.usageClassification}: ${c.relationToLyrics}`
@@ -74,13 +70,6 @@ export function buildFinalReport(
     linguisticObservations: result.grammarFindings.map(
       (g) => `[${g.type}] "${g.originalExcerpt}" — ${g.explanation}`
     ),
-    compositionObservations: result.compositionFindings.map((c) => c.observation),
-    productionObservations: [result.mood.disclaimer, result.mood.movementDescription],
-    congregationalFit: result.congregational.applicable
-      ? [result.congregational.notes, result.congregational.clarity, result.congregational.singability]
-          .filter((v): v is string => Boolean(v && v.trim()))
-          .join(" ") || "Ver detalhes da análise congregacional."
-      : "Não avaliado como música congregacional nesta análise.",
     strengths: result.overview.strengths,
     attentionPoints: result.overview.attentionPoints,
     pendingQuestions: result.composerQuestions.map((q) => q.question),

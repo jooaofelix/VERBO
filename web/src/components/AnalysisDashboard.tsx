@@ -3,9 +3,6 @@ import { useState } from "react";
 import { setFindingDecision } from "../repositories/versionsRepository.js";
 import type { SongDoc, VersionDoc, WithId } from "../types/firestore.js";
 import { BibleTheologyTab } from "./analysis/BibleTheologyTab.js";
-import { CoherenceTab } from "./analysis/CoherenceTab.js";
-import { CompositionTab } from "./analysis/CompositionTab.js";
-import { CongregationalTab } from "./analysis/CongregationalTab.js";
 import { OverviewTab } from "./analysis/OverviewTab.js";
 import { QuestionsTab } from "./analysis/QuestionsTab.js";
 import { GrammarTab } from "./analysis/GrammarTab.js";
@@ -17,10 +14,7 @@ const TABS = [
   "Visão geral",
   "Letra destacada",
   "Bíblia & Teologia",
-  "Mensagem & Coerência",
   "Português",
-  "Composição",
-  "Congregacional",
   "Sugestões",
   "Perguntas",
   "Relatório",
@@ -38,8 +32,6 @@ interface Props {
 const AREA_LABELS: Record<string, string> = {
   biblica_teologica: "Bíblia & Teologia",
   portugues: "Português",
-  composicao: "Composição",
-  congregacional: "Congregacional",
 };
 
 export function AnalysisDashboard({ uid, song, version, result }: Props) {
@@ -104,10 +96,7 @@ export function AnalysisDashboard({ uid, song, version, result }: Props) {
         />
       )}
       {tab === "Bíblia & Teologia" && <BibleTheologyTab result={result} />}
-      {tab === "Mensagem & Coerência" && <CoherenceTab result={result} />}
       {tab === "Português" && <GrammarTab result={result} />}
-      {tab === "Composição" && <CompositionTab result={result} />}
-      {tab === "Congregacional" && <CongregationalTab result={result} />}
       {tab === "Sugestões" && (
         <SuggestionsTab result={result} decisions={decisions} onDecide={handleDecide} />
       )}

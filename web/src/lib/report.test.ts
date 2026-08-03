@@ -26,7 +26,6 @@ function version(): WithId<VersionDoc> {
     sections: [],
     context: {
       theologicalTradition: "nao_selecionar",
-      desiredChangeLevel: "refinar_mantendo_voz",
       bibleReferencesProvidedByUser: [],
     },
     userId: "u1",
@@ -44,11 +43,7 @@ function result(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
     revisionMode: "portugues",
     overview: {
       perceivedCentralMessage: "Testemunho de fidelidade de Deus.",
-      compositionType: "poética",
-      mainEmotion: "contemplativa",
-      emotionalMovement: "poética",
       likelyAudience: "Geral",
-      likelyUsageContext: "culto",
       strengths: ["Progressão do medo para a esperança."],
       attentionPoints: [],
       consistencyWithStatedIntent: "nao_foi_possivel_determinar",
@@ -57,15 +52,6 @@ function result(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
     bibleReferences: [],
     biblicalContext: [],
     theologicalClaims: [],
-    coherence: {
-      messageAppearsClearly: true,
-      lyricalSubjectConsistent: true,
-      addresseeConsistent: true,
-      intensityTrend: "estatica",
-      unansweredQuestions: [],
-      narrativeMap: { structureType: "poetica" },
-      pointOfView: { dominantPerson: "1ª pessoa", whoSpeaks: "eu lírico", toWhom: "Deus", shifts: [] },
-    },
     grammarFindings: [
       {
         id: "gram-1",
@@ -92,20 +78,7 @@ function result(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
         source: "ia",
       },
     ],
-    compositionFindings: [],
-    chorusAnalysis: { present: false, candidatePhrases: [] },
-    rhymeFindings: [],
     prosodyFindings: [],
-    mood: {
-      perceivedFunctions: ["reflexiva"],
-      lyricalEmotions: ["contemplativa"],
-      textualEnergy: "constante",
-      movementDescription: "Sem observações de produção adicionais para este texto.",
-      probableStyleHypotheses: [],
-      confidence: "medium",
-      disclaimer: "Esta classificação considera apenas a letra.",
-    },
-    congregational: { applicable: false },
     composerQuestions: [],
     findings: [],
     limitations: ["Esta análise considerou apenas o texto da letra."],
@@ -170,9 +143,8 @@ describe("buildFinalReport", () => {
     expect(wholeReportText).not.toContain("autoajuda");
   });
 
-  it("does not concatenate structureOverview or emotion with other fields", () => {
+  it("does not concatenate perceivedMessage with other fields", () => {
     const report = buildFinalReport(song(), version(), result());
-    expect(report.structureOverview).toBe("poética");
-    expect(report.emotion).toBe("contemplativa");
+    expect(report.perceivedMessage).toBe("Testemunho de fidelidade de Deus.");
   });
 });

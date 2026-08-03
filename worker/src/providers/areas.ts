@@ -3,15 +3,10 @@ import {
   ConsistencyLevelSchema,
   GrammarFindingSchema,
   GrammarFindingTypeSchema,
-  LyricalEmotionSchema,
-  NarrativeStructureTypeSchema,
   ProximitySchema,
-  SongFunctionSchema,
-  TextualEnergySchema,
   type AIProducedAnalysis,
   type AnalyzeRequest,
   type BibleReference,
-  type CompositionFinding,
   type ConfidenceLevel,
   type GrammarFinding,
   type RevisionMode,
@@ -22,19 +17,19 @@ import type { ResolvedUserReference } from "../services/bible/lookup.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 /**
- * The four independent slices a "revisão completa" is broken into. Each one
- * maps 1:1 to a RevisionMode value, which is what an "individual mode"
- * request (revisionMode !== "rapida"/"completa") already names.
+ * The two areas a "revisão completa" is broken into — every bit of AI depth
+ * and token budget is concentrated here: biblical text/context review and
+ * Portuguese-language review (spelling, grammar, agreement). Each maps 1:1
+ * to a RevisionMode value, which is what an "individual mode" request
+ * (revisionMode !== "rapida"/"completa") already names.
  */
-export type Area = "biblica_teologica" | "portugues" | "composicao" | "congregacional";
+export type Area = "biblica_teologica" | "portugues";
 
-export const ALL_AREAS: Area[] = ["biblica_teologica", "portugues", "composicao", "congregacional"];
+export const ALL_AREAS: Area[] = ["biblica_teologica", "portugues"];
 
 export const AREA_LABELS: Record<Area, string> = {
   biblica_teologica: "bíblica e teológica",
   portugues: "português",
-  composicao: "composição",
-  congregacional: "congregacional",
 };
 
 /** Which areas a given revision mode needs. "rapida" is handled separately (see quickReview.ts). */
@@ -105,28 +100,7 @@ export const PortuguesAIShapeSchema = z.object({
 });
 export type PortuguesAIShape = z.infer<typeof PortuguesAIShapeSchema>;
 
-export const ComposicaoAIShapeSchema = z.object({
-  estrutura: z.string().default(""),
-  classificacaoLirica: z.string().default(""),
-  emocao: z.string().default(""),
-  energiaTextual: z.string().default(""),
-  temaCentral: z.string().default(""),
-  observacoesProducao: z.array(z.string()).default([]),
-  pontosFortes: z.array(z.string()).default([]),
-  sugestoes: z.array(z.string()).default([]),
-});
-export type ComposicaoAIShape = z.infer<typeof ComposicaoAIShapeSchema>;
-
-export const CongregacionalAIShapeSchema = z.object({
-  adequacao: z.string().default(""),
-  facilidadeDeCanto: z.string().default(""),
-  clarezaDaMensagem: z.string().default(""),
-  pontosFortes: z.array(z.string()).default([]),
-  sugestoes: z.array(z.string()).default([]),
-});
-export type CongregacionalAIShape = z.infer<typeof CongregacionalAIShapeSchema>;
-
-export type AreaAIShape = BiblicalAIShape | PortuguesAIShape | ComposicaoAIShape | CongregacionalAIShape;
+export type AreaAIShape = BiblicalAIShape | PortuguesAIShape;
 
 export function areaAISchemaFor(area: Area): z.ZodObject<any> {
   switch (area) {
@@ -134,10 +108,6 @@ export function areaAISchemaFor(area: Area): z.ZodObject<any> {
       return BiblicalAIShapeSchema;
     case "portugues":
       return PortuguesAIShapeSchema;
-    case "composicao":
-      return ComposicaoAIShapeSchema;
-    case "congregacional":
-      return CongregacionalAIShapeSchema;
   }
 }
 
@@ -149,8 +119,6 @@ export function areaEmptyShape(area: Area): AreaAIShape {
 const AREA_JSON_SCHEMAS: Record<Area, ReturnType<typeof zodToJsonSchema>> = {
   biblica_teologica: zodToJsonSchema(BiblicalAIShapeSchema, { target: "openApi3", $refStrategy: "none" }),
   portugues: zodToJsonSchema(PortuguesAIShapeSchema, { target: "openApi3", $refStrategy: "none" }),
-  composicao: zodToJsonSchema(ComposicaoAIShapeSchema, { target: "openApi3", $refStrategy: "none" }),
-  congregacional: zodToJsonSchema(CongregacionalAIShapeSchema, { target: "openApi3", $refStrategy: "none" }),
 };
 
 /** Small, area-specific JSON Schema for Workers AI's native structured-output mode — never the whole AnalysisResult schema. */
@@ -331,37 +299,6 @@ const AREA_KEY_ALIASES: Record<Area, Record<string, string>> = {
     prioridades_de_correcao: "prioridades",
     priorities: "prioridades",
   },
-  composicao: {
-    estrutura_lirica: "estrutura",
-    structure: "estrutura",
-    classificacao: "classificacaoLirica",
-    classificacao_lirica: "classificacaoLirica",
-    emocao_predominante: "emocao",
-    emotion: "emocao",
-    energia: "energiaTextual",
-    energia_textual: "energiaTextual",
-    textualEnergy: "energiaTextual",
-    tema: "temaCentral",
-    tema_central: "temaCentral",
-    observacoes_producao: "observacoesProducao",
-    producao: "observacoesProducao",
-    pontos_fortes: "pontosFortes",
-    strengths: "pontosFortes",
-    sugestao: "sugestoes",
-    suggestions: "sugestoes",
-  },
-  congregacional: {
-    adequacao_congregacional: "adequacao",
-    facilidade_de_canto: "facilidadeDeCanto",
-    facilidade_canto: "facilidadeDeCanto",
-    singability: "facilidadeDeCanto",
-    clareza: "clarezaDaMensagem",
-    clareza_da_mensagem: "clarezaDaMensagem",
-    pontos_fortes: "pontosFortes",
-    strengths: "pontosFortes",
-    sugestao: "sugestoes",
-    suggestions: "sugestoes",
-  },
 };
 
 /** Renames a handful of common alternate key names a small model might use onto the canonical field names, without overwriting a key the model already got right. */
@@ -387,42 +324,34 @@ function formatSections(sections: SongSection[]): string {
 
 const AREA_FOCUS: Record<Area, string> = {
   biblica_teologica:
-    "Identifique referências bíblicas prováveis (ex.: \"Salmos 23:1\"), sua relação com a letra e o tipo " +
-    "(direta, alusão ou temática), observações teológicas e pontos fortes. Nunca escreva o texto do " +
-    "versículo, apenas a referência. Nos pontos fortes, cite elementos concretos da letra (uma frase-eixo " +
-    "repetida, uma alusão bíblica específica, uma declaração sobre o caráter de Deus) — nunca elogios " +
-    "genéricos. Classifique o gênero da canção como testemunho, redenção, restauração, esperança em Deus, " +
-    "gratidão, confiança ou adoração; nunca como \"autoajuda\".",
+    "Faça uma revisão bíblica de texto e de contexto. Identifique referências bíblicas prováveis (ex.: " +
+    "\"Salmos 23:1\"), sua relação com a letra e o tipo (direta, alusão ou temática), explicando em pelo " +
+    "menos uma frase específica por que a conexão faz sentido à luz do contexto da passagem — nunca uma " +
+    "resposta de uma palavra só, como \"temática\" ou \"alusão\". Nunca escreva o texto do versículo, " +
+    "apenas a referência. Acrescente observações teológicas e pontos fortes citando elementos concretos da " +
+    "letra (uma frase-eixo repetida, uma alusão bíblica específica, uma declaração sobre o caráter de " +
+    "Deus) — nunca elogios genéricos. Classifique o gênero da canção como testemunho, redenção, " +
+    "restauração, esperança em Deus, gratidão, confiança ou adoração; nunca como \"autoajuda\".",
   portugues:
     "Revise a letra em português palavra por palavra e frase por frase: ortografia, concordância, " +
     "regência, pontuação, clareza, coerência, consistência de pessoa verbal (1ª pessoa \"eu\" vs. 1ª " +
-    "pessoa do plural \"nós\"), fluidez e prosódia. Liste em correcoes no máximo 6 problemas, priorizando " +
-    "os mais importantes e graves — nunca mais que 6, mesmo que existam mais. Para CADA correção, cite o " +
-    "trecho original exato (trechoOriginal), classifique o tipo e a gravidade, explique especificamente " +
-    "por que está incorreto ou confuso em 1-2 frases curtas (nunca uma explicação vaga como \"pode " +
-    "melhorar a fluidez\" ou \"a concordância precisa ser revista\"), e ofereça duas reescritas " +
-    "alternativas curtas (opcao1, opcao2), indicando em observacaoDeSentido, em poucas palavras, se as " +
-    "alternativas mudam o sentido original. Liste em problemasDeConsistencia qualquer alternância não " +
-    "intencional entre primeira pessoa do singular e do plural, ou outras inconsistências narrativas. Em " +
-    "prioridades, liste no máximo 5 correções mais importantes, em ordem, de forma direta e acionável. Em " +
-    "pontosFortes, cite elementos concretos da letra, nunca elogios vagos.",
-  composicao:
-    "Analise a composição: estrutura, classificação lírica, emoção predominante, energia textual, tema " +
-    "central, observações de produção, pontos fortes e sugestões. Nos pontos fortes, cite elementos " +
-    "concretos da letra (por exemplo: progressão de uma emoção para outra, repetição de uma frase-eixo, " +
-    "linguagem acessível) — nunca elogios genéricos. Nunca classifique a canção como \"autoajuda\"; " +
-    "prefira testemunho, redenção, restauração, esperança em Deus, gratidão, confiança ou adoração.",
-  congregacional:
-    "Avalie o uso congregacional em frases curtas e objetivas (no máximo 2 frases por campo): adequação, " +
-    "facilidade de canto, clareza da mensagem, pontos fortes e sugestões.",
+    "pessoa do plural \"nós\"), fluidez e prosódia. Liste em correcoes no máximo 8 problemas, priorizando " +
+    "os mais importantes e graves. Para CADA correção, cite o trecho original exato (trechoOriginal), " +
+    "classifique o tipo e a gravidade, explique especificamente por que está incorreto ou confuso em 1-2 " +
+    "frases curtas (nunca uma explicação vaga como \"pode melhorar a fluidez\" ou \"a concordância precisa " +
+    "ser revista\"), e ofereça duas reescritas alternativas curtas (opcao1, opcao2), indicando em " +
+    "observacaoDeSentido, em poucas palavras, se as alternativas mudam o sentido original. Liste em " +
+    "problemasDeConsistencia qualquer alternância não intencional entre primeira pessoa do singular e do " +
+    "plural, ou outras inconsistências narrativas. Em prioridades, liste no máximo 5 correções mais " +
+    "importantes, em ordem, de forma direta e acionável. Em pontosFortes, cite elementos concretos da " +
+    "letra, nunca elogios vagos.",
 };
 
-// The português and congregacional schemas ask for the most string-heavy
-// content (an array of rich correction objects, or several free-text
-// evaluation fields) — the two areas most likely to run out of the retry's
-// smaller token budget before finishing the JSON object. Their retry prompt
+// Português asks for the most string-heavy content (an array of rich
+// correction objects) — the area most likely to run out of the retry's
+// smaller token budget before finishing the JSON object. Its retry prompt
 // asks for noticeably less than the primary attempt, on top of the generic
-// "Seja breve." every other area gets, specifically to avoid a truncated
+// "Seja breve." biblica_teologica gets, specifically to avoid a truncated
 // (and therefore fully discarded) response on the very attempt that already
 // has the least room to work with.
 const AREA_FOCUS_RETRY_OVERRIDES: Partial<Record<Area, string>> = {
@@ -430,22 +359,21 @@ const AREA_FOCUS_RETRY_OVERRIDES: Partial<Record<Area, string>> = {
     "Revise a letra em português, de forma extremamente concisa. Liste em correcoes no máximo 3 " +
     "problemas mais importantes: trecho original, tipo, gravidade, uma explicação objetiva em 1 frase, e " +
     "duas opções de reescrita curtas. Nunca explicações vagas.",
-  congregacional:
-    "Avalie o uso congregacional de forma extremamente concisa: 1 frase por campo (adequação, facilidade " +
-    "de canto, clareza da mensagem), no máximo 2 pontos fortes e 2 sugestões.",
 };
 
 // Gemini isn't bound by Cloudflare's per-request neuron/timeout budget the
-// way the free Workers AI model is, so when it's the one answering, it can
-// afford to be asked for meaningfully more: more corrections, more
-// references, longer per-item explanations, in every area. The Workers AI
-// retry (if Gemini fails) always falls back to the terser AREA_FOCUS above,
-// which is calibrated for that smaller model's real capacity.
+// way the free Workers AI model is, so when it's the one answering — now the
+// only two areas that exist, this is virtually always — it can afford to be
+// asked for meaningfully more: more corrections, more references, longer
+// per-item explanations. The Workers AI retry (if Gemini fails) always
+// falls back to the terser AREA_FOCUS above, which is calibrated for that
+// smaller model's real capacity. With composição and congregacional gone,
+// every bit of this extra depth goes into these two areas.
 const AREA_FOCUS_GEMINI_OVERRIDES: Partial<Record<Area, string>> = {
   portugues:
     "Revise a letra em português palavra por palavra e frase por frase, com profundidade real: ortografia, " +
     "concordância verbal e nominal, regência, pontuação, clareza, coerência, consistência de pessoa verbal " +
-    "(1ª pessoa \"eu\" vs. 1ª pessoa do plural \"nós\"), fluidez e prosódia. Liste em correcoes até 10 " +
+    "(1ª pessoa \"eu\" vs. 1ª pessoa do plural \"nós\"), fluidez e prosódia. Liste em correcoes até 12 " +
     "problemas reais — não invente problemas que não existem, mas também não deixe de citar um problema " +
     "real só para ser breve. Para CADA correção, cite o trecho original exato (trechoOriginal), classifique " +
     "o tipo e a gravidade, e explique em pelo menos duas frases específicas por que está incorreto ou " +
@@ -457,36 +385,20 @@ const AREA_FOCUS_GEMINI_OVERRIDES: Partial<Record<Area, string>> = {
     "em ordem, de forma direta e acionável. Em pontosFortes, cite elementos concretos da letra (imagens, " +
     "repetições, progressão emocional), nunca elogios vagos.",
   biblica_teologica:
-    "Identifique referências bíblicas prováveis (ex.: \"Salmos 23:1\"). Se a letra permitir, identifique " +
-    "2 ou 3 referências distintas, não apenas uma. Para CADA referência, classifique o tipo (direta, " +
-    "alusão ou temática) e escreva em relacaoComALetra pelo menos duas frases específicas: (1) qual trecho " +
-    "ou imagem exata da letra remete a essa passagem, citando palavras da própria letra, e (2) por que essa " +
-    "conexão faz sentido teologicamente — nunca uma resposta de uma palavra só, como \"temática\" ou " +
-    "\"alusão\". Nunca escreva o texto do versículo, apenas a referência. Acrescente observações " +
-    "teológicas específicas (nunca genéricas) e pontos fortes citando elementos concretos da letra (uma " +
-    "frase-eixo repetida, uma alusão bíblica específica, uma declaração sobre o caráter de Deus) — nunca " +
-    "elogios genéricos. Classifique o gênero da canção como testemunho, redenção, restauração, esperança " +
-    "em Deus, gratidão, confiança ou adoração; nunca como \"autoajuda\".",
-  composicao:
-    "Analise a composição com profundidade real: estrutura (introdução, versos, pré-refrão, refrão, ponte, " +
-    "encerramento), classificação lírica, emoção predominante e como ela se desenvolve ao longo da letra, " +
-    "energia textual, tema central, observações de produção e sugestões. Em observacoesProducao, cite pelo " +
-    "menos duas ou três observações específicas sobre estrutura, função do refrão, uso de repetição ou " +
-    "construção da narrativa — nunca uma frase genérica de uma linha. Nos pontos fortes, cite elementos " +
-    "concretos da letra (por exemplo: progressão de uma emoção para outra, repetição de uma frase-eixo " +
-    "específica, linguagem acessível, contraste entre seções) — nunca elogios genéricos como \"letra " +
-    "bonita\". Em sugestões, ofereça pelo menos duas ou três sugestões acionáveis e específicas, citando " +
-    "trechos da letra quando possível. Nunca classifique a canção como \"autoajuda\"; prefira testemunho, " +
-    "redenção, restauração, esperança em Deus, gratidão, confiança ou adoração.",
-  congregacional:
-    "Avalie o uso congregacional com profundidade real: adequação para o culto (explicando por que serve ou " +
-    "não, em pelo menos duas frases), facilidade de canto (repetição de frases, previsibilidade do texto, " +
-    "extensão aproximada de vocabulário emocional), clareza da mensagem para uma comunidade diversa em idade " +
-    "e tempo de fé, pontos fortes específicos e sugestões concretas de ajuste. Cada campo de texto deve ter " +
-    "pelo menos duas frases específicas, citando trechos da letra quando relevante — nunca uma frase " +
-    "genérica de uma linha como \"letra adequada para culto\". Em pontosFortes, cite elementos concretos " +
-    "(repetição fácil de memorizar, linguagem acessível, tema unificador). Em sugestões, ofereça pelo menos " +
-    "duas sugestões acionáveis.",
+    "Faça uma revisão bíblica de texto e de contexto com toda a profundidade possível — esta é a área " +
+    "central da análise. Identifique referências bíblicas prováveis (ex.: \"Salmos 23:1\"). Se a letra " +
+    "permitir, identifique de 3 a 5 referências distintas, não apenas uma ou duas. Para CADA referência, " +
+    "classifique o tipo (direta, alusão ou temática) e escreva em relacaoComALetra pelo menos duas frases " +
+    "específicas: (1) qual trecho ou imagem exata da letra remete a essa passagem, citando palavras da " +
+    "própria letra, e (2) por que essa conexão faz sentido teologicamente à luz do contexto histórico e " +
+    "literário da passagem, não apenas da frase isolada — nunca uma resposta de uma palavra só, como " +
+    "\"temática\" ou \"alusão\". Nunca escreva o texto do versículo, apenas a referência. Acrescente pelo " +
+    "menos três observações teológicas específicas (nunca genéricas) sobre como a letra dialoga com " +
+    "doutrinas ou temas bíblicos centrais, alertas quando alguma afirmação da letra pareça teologicamente " +
+    "imprecisa ou carecer de contexto, e pontos fortes citando elementos concretos da letra (uma frase-eixo " +
+    "repetida, uma alusão bíblica específica, uma declaração sobre o caráter de Deus) — nunca elogios " +
+    "genéricos. Classifique o gênero da canção como testemunho, redenção, restauração, esperança em Deus, " +
+    "gratidão, confiança ou adoração; nunca como \"autoajuda\".",
 };
 
 // When the composer already had a base verse in mind (context.bibleReferencesProvidedByUser),
@@ -559,10 +471,10 @@ ${formatSections(sections)}
 }
 
 export const AREA_SYSTEM_PROMPT =
-  "Você é revisor de letras musicais cristãs (bíblia, teologia, português, composição, uso " +
-  "congregacional). Nunca escreva o texto de um versículo bíblico — apenas a referência. Não " +
-  "trate escolha artística como erro. Não avalie melodia, BPM ou tonalidade, pois só o texto foi " +
-  "enviado. Preencha apenas os campos pedidos.";
+  "Você é revisor de letras musicais cristãs, especializado em revisão bíblica de texto e de contexto e " +
+  "em revisão de português (ortografia, gramática e concordância). Nunca escreva o texto de um versículo " +
+  "bíblico — apenas a referência. Não trate escolha artística como erro. Não avalie melodia, BPM ou " +
+  "tonalidade, pois só o texto foi enviado. Preencha apenas os campos pedidos.";
 
 export const AREA_SYSTEM_PROMPT_RETRY =
   "Revisor de letras musicais cristãs. Nunca escreva o texto de um versículo. Seja breve e direto.";
@@ -575,41 +487,6 @@ function firstNonEmpty(...values: Array<string | undefined>): string | undefined
     if (v && v.trim().length > 0) return v.trim();
   }
   return undefined;
-}
-
-const DISPLAY_ACCENT_FIXES: Record<string, string> = {
-  poetica: "poética",
-  liturgica: "litúrgica",
-  estatica: "estática",
-  media: "média",
-};
-
-/** Restores accents on a small set of words a model sometimes drops, without touching text it already got right. */
-function normalizeDisplayValue(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return trimmed;
-  const key = trimmed.toLowerCase();
-  return DISPLAY_ACCENT_FIXES[key] ?? trimmed;
-}
-
-function normalizeToken(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .replace(/\s+/g, "_");
-}
-
-function matchEnumOrFallback<T extends string>(
-  value: string | undefined,
-  options: readonly T[],
-  fallback: [T, ...T[]]
-): [T, ...T[]] {
-  if (!value) return fallback;
-  const normalized = normalizeToken(value);
-  const match = options.find((o) => o === normalized);
-  return match ? [match] : fallback;
 }
 
 function dedupe(values: string[]): string[] {
@@ -778,17 +655,12 @@ function mapBiblicalReferences(
     });
 }
 
-function toGeneralFindings(
-  texts: string[],
-  category: "theological" | "composition" | "congregational",
-  severity: "observation" | "attention",
-  idPrefix: string
-) {
+function toGeneralFindings(texts: string[], severity: "observation" | "attention", idPrefix: string) {
   return texts
     .filter((t) => t && t.trim().length > 0)
     .map((t, i) => ({
       id: `${idPrefix}-${i}`,
-      category,
+      category: "theological" as const,
       originalExcerpt: "(observação geral)",
       title: t.length > 60 ? `${t.slice(0, 57)}...` : t,
       explanation: t,
@@ -801,8 +673,6 @@ function toGeneralFindings(
 export interface AreaShapes {
   biblica_teologica?: BiblicalAIShape;
   portugues?: PortuguesAIShape;
-  composicao?: ComposicaoAIShape;
-  congregacional?: CongregacionalAIShape;
 }
 
 /**
@@ -815,38 +685,10 @@ export interface AreaShapes {
 export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShapes): AIProducedAnalysis {
   const biblical = shapes.biblica_teologica;
   const portugues = shapes.portugues;
-  const composicao = shapes.composicao;
-  const congregacional = shapes.congregacional;
 
   const messagePerceived = stripSelfHelpLabel(
-    firstNonEmpty(biblical?.mensagemPercebida, composicao?.temaCentral) ??
-      "Não foi possível determinar a mensagem central nesta análise."
+    firstNonEmpty(biblical?.mensagemPercebida) ?? "Não foi possível determinar a mensagem central nesta análise."
   );
-
-  const structureDisplay = stripSelfHelpLabel(
-    composicao?.estrutura?.trim() ? normalizeDisplayValue(composicao.estrutura) : "Não determinado"
-  );
-
-  const perceivedFunctions = matchEnumOrFallback(
-    composicao?.classificacaoLirica,
-    SongFunctionSchema.options,
-    ["reflexiva"]
-  );
-
-  const emotionDisplay = stripSelfHelpLabel(
-    composicao?.emocao?.trim() ? normalizeDisplayValue(composicao.emocao) : "Não determinado"
-  );
-  const lyricalEmotions = matchEnumOrFallback(composicao?.emocao, LyricalEmotionSchema.options, ["contemplativa"]);
-
-  const [textualEnergy] = matchEnumOrFallback(composicao?.energiaTextual, TextualEnergySchema.options, [
-    "constante",
-  ]);
-
-  const [structureType] = matchEnumOrFallback(composicao?.estrutura, NarrativeStructureTypeSchema.options, [
-    "poetica",
-  ]);
-
-  const productionNotes = (composicao?.observacoesProducao ?? []).filter((s) => s.trim().length > 0);
 
   const bibleReferences = mapBiblicalReferences(biblical?.referenciasBiblicas ?? [], request);
 
@@ -874,31 +716,11 @@ export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShap
       return GrammarFindingSchema.parse(finding);
     });
 
-  const compositionFindings: CompositionFinding[] = (composicao?.sugestoes ?? [])
-    .filter((s) => s && s.trim().length > 0)
-    .map((s, i) => ({
-      id: `comp-${i}`,
-      aspect: "imagem_original",
-      observation: s,
-      isStrength: false,
-      suggestion: s,
-    }));
-
-  const congregationalNotes = firstNonEmpty(congregacional?.adequacao);
-  const congregational = {
-    applicable: request.context.usageContext === "congregacional",
-    notes: congregationalNotes,
-    clarity: firstNonEmpty(congregacional?.clarezaDaMensagem),
-    singability: firstNonEmpty(congregacional?.facilidadeDeCanto),
-  };
-
-  const strengthsUnion = dedupe([
-    ...(biblical?.pontosFortes ?? []),
-    ...(portugues?.pontosFortes ?? []),
-    ...(composicao?.pontosFortes ?? []),
-    ...(congregacional?.pontosFortes ?? []),
-  ]).map(stripSelfHelpLabel);
-  const strengths = strengthsUnion.length > 0 ? strengthsUnion : ["Não foi possível identificar pontos fortes nesta análise."];
+  const strengthsUnion = dedupe([...(biblical?.pontosFortes ?? []), ...(portugues?.pontosFortes ?? [])]).map(
+    stripSelfHelpLabel
+  );
+  const strengths =
+    strengthsUnion.length > 0 ? strengthsUnion : ["Não foi possível identificar pontos fortes nesta análise."];
 
   const topPriorities = (portugues?.prioridades ?? [])
     .filter((p) => p.trim().length > 0)
@@ -910,18 +732,9 @@ export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShap
     : undefined;
 
   const findings = [
-    ...toGeneralFindings(biblical?.observacoesTeologicas ?? [], "theological", "observation", "theo-obs"),
-    ...toGeneralFindings(biblical?.alertas ?? [], "theological", "attention", "theo-alert"),
-    ...toGeneralFindings(composicao?.sugestoes ?? [], "composition", "observation", "comp-sug"),
-    ...toGeneralFindings(congregacional?.sugestoes ?? [], "congregational", "observation", "cong-sug"),
+    ...toGeneralFindings(biblical?.observacoesTeologicas ?? [], "observation", "theo-obs"),
+    ...toGeneralFindings(biblical?.alertas ?? [], "attention", "theo-alert"),
   ];
-
-  const movementDescription =
-    productionNotes.length > 0
-      ? productionNotes.join(" ")
-      : "Sem observações de produção adicionais para este texto.";
-
-  const chorusPresent = false;
 
   const hasUserProvidedReferences = request.context.bibleReferencesProvidedByUser.length > 0;
   const consistencyWithStatedIntent =
@@ -938,11 +751,7 @@ export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShap
   return {
     overview: {
       perceivedCentralMessage: messagePerceived,
-      compositionType: structureDisplay,
-      mainEmotion: emotionDisplay,
-      emotionalMovement: structureDisplay,
       likelyAudience: request.context.intendedAudience || "Não determinado",
-      likelyUsageContext: request.context.usageContext ?? "Não determinado",
       strengths,
       attentionPoints: dedupe(biblical?.alertas ?? []),
       consistencyWithStatedIntent,
@@ -951,35 +760,7 @@ export function mergeAreasIntoAnalysis(request: AnalyzeRequest, shapes: AreaShap
     bibleReferences,
     biblicalContext: [],
     theologicalClaims: [],
-    coherence: {
-      messageAppearsClearly: Boolean(messagePerceived),
-      lyricalSubjectConsistent: true,
-      addresseeConsistent: true,
-      intensityTrend: "estatica",
-      unansweredQuestions: [],
-      narrativeMap: { structureType },
-      pointOfView: {
-        dominantPerson: "Não avaliado nesta versão da análise.",
-        whoSpeaks: "Não avaliado nesta versão da análise.",
-        toWhom: "Não avaliado nesta versão da análise.",
-        shifts: [],
-      },
-    },
     grammarFindings,
-    compositionFindings,
-    chorusAnalysis: { present: chorusPresent, candidatePhrases: [] },
-    rhymeFindings: [],
-    mood: {
-      perceivedFunctions,
-      lyricalEmotions,
-      textualEnergy,
-      movementDescription,
-      probableStyleHypotheses: [],
-      confidence: "medium",
-      disclaimer:
-        "Esta classificação considera apenas a letra. Arranjo, melodia, harmonia, interpretação e produção podem alterar completamente a percepção musical.",
-    },
-    congregational,
     composerQuestions: [],
     findings,
     limitations: [],

@@ -20,17 +20,6 @@ function reportSections(report: FinalReport): Array<[string, string[]]> {
         ...report.attentionPoints,
       ],
     ],
-    [
-      "Estrutura e composição",
-      [
-        `Estrutura: ${report.structureOverview}`,
-        `Classificação lírica: ${report.lyricalClassification}`,
-        `Emoção predominante: ${report.emotion}`,
-        ...report.compositionObservations,
-        ...report.productionObservations,
-      ],
-    ],
-    ["Adequação congregacional", [report.congregationalFit]],
     ["Perguntas pendentes ao compositor", report.pendingQuestions],
     ["Sugestões prioritárias (todas as áreas)", report.prioritySuggestions],
     ["Limitações", report.limitations],

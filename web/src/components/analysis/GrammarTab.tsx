@@ -147,25 +147,6 @@ export function GrammarTab({ result }: { result: AnalysisResult }) {
           </ul>
         )}
       </section>
-
-      <section>
-        <h3 className="mb-2 text-sm font-semibold">Rimas e sonoridade</h3>
-        {result.rhymeFindings.length === 0 ? (
-          <p className="text-sm text-ink-700/60 dark:text-parchment-100/50">
-            Nenhuma observação de rima destacada. A ausência de rimas não é, por si só, um problema.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-1.5 text-sm">
-            {result.rhymeFindings.map((r) => (
-              <li key={r.id} className="rounded border border-ink-800/10 p-2 dark:border-parchment-50/10">
-                <span className="font-medium">{r.type.replaceAll("_", " ")}: </span>
-                {r.lines.join(" / ")}
-                <p className="mt-1 text-xs text-ink-700/60 dark:text-parchment-100/50">{r.note}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }

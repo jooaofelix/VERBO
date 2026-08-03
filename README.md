@@ -1,7 +1,8 @@
 # Verbo & Canção
 
-Apreciação e validação de letras musicais — teologia, português e composição, lado a lado
-com a voz autoral do compositor. Esta versão é 100% gratuita para operar: front-end e IA rodam
+Apreciação e validação de letras musicais — foco em revisão bíblica de texto e de contexto, e em
+revisão de português (ortografia, gramática e concordância) —, lado a lado com a voz autoral do
+compositor. Esta versão é 100% gratuita para operar: front-end e IA rodam
 inteiramente no **Cloudflare** (Pages + Workers AI, sem chave de API paga), e o único dado
 persistente vive no **Firebase** (Authentication + Cloud Firestore, plano Spark/gratuito).
 
@@ -68,10 +69,11 @@ rules).
    nesta versão).
 4. Rodam checagens determinísticas de português (regex/dicionário — nunca alucinam) e uma
    estimativa de prosódia (sílabas por linha), sempre calculadas no próprio Worker, nunca pela IA.
-5. Uma única chamada ao binding `env.AI` (Workers AI) retorna um JSON coerente com o schema Zod
-   (visão geral, referências bíblicas, teologia, coerência narrativa, composição, refrão, rimas,
-   emoção, adequação congregacional, perguntas, sugestões). Se a resposta não bater com o schema,
-   há uma tentativa automática de reparo antes de desistir. Sem o binding de IA disponível (por
+5. Uma chamada por área (bíblica/teológica e português) ao binding `env.AI` (Workers AI, ou ao
+   Gemini quando configurado) retorna um JSON coerente com o schema Zod de cada área — referências
+   bíblicas, contexto histórico/teológico, observações teológicas, correções de português. Se a
+   resposta não bater com o schema, há uma tentativa automática de reparo antes de desistir. Sem o
+   binding de IA disponível (por
    exemplo, rodando `wrangler dev` localmente sem `--remote`), a análise cai automaticamente em
    **modo demonstração**.
 6. Toda referência bíblica que o modelo identificar é cruzada com um pequeno dataset curado de
@@ -248,9 +250,9 @@ versículo — nunca um texto inventado.
 ## IA paga opcional (Google Gemini) para toda a análise
 
 Se você já tem billing ativo no Google (Firebase Blaze ou um projeto Google Cloud com
-faturamento), pode configurar uma chave do Gemini para melhorar a qualidade de **todas as
-áreas** de uma "revisão completa" (português, bíblica/teológica, composição e congregacional) —
-não só uma parte.
+faturamento), pode configurar uma chave do Gemini para melhorar a qualidade de **ambas as
+áreas** de uma "revisão completa" (bíblica/teológica e português) — a análise concentra toda a
+profundidade de IA nessas duas áreas.
 
 1. Gere uma chave em [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (mesmo
    projeto/conta do seu billing do Google).
@@ -289,13 +291,13 @@ exige conexão, já que depende do Worker.
 - Isolamento por usuário garantido inteiramente por `firestore.rules` (não há mais uma segunda
   camada de servidor confiável, já que o Worker não toca no Firestore).
 - Criação de composição sem nenhum campo obrigatório além da letra.
-- Formulário de intenção/contexto completo (mensagem, tradição teológica, contexto de uso etc.),
-  totalmente opcional.
+- Formulário de intenção/contexto simplificado (mensagem, tradição teológica, versículos base
+  etc.), com a maioria dos campos preenchidos por clique (chips), totalmente opcional.
 - Editor de letra com sugestão automática de seções (verso/refrão/ponte...) via Worker, corrigível
   pelo usuário; autosave com debounce e indicador de estado de salvamento; o texto original nunca
   é alterado silenciosamente.
-- Análise completa em abas: Visão geral, Letra destacada, Bíblia & Teologia, Mensagem &
-  Coerência, Português, Composição, Congregacional, Sugestões, Perguntas, Relatório.
+- Análise completa em abas: Visão geral, Letra destacada, Bíblia & Teologia, Português,
+  Sugestões, Perguntas, Relatório.
 - Destaques coloridos na letra ligados a cada achado, com botões aceitar/ignorar (a decisão fica
   salva na versão, no Firestore).
 - Histórico de versões por composição, duplicação de versão, comparação lado a lado (diff de

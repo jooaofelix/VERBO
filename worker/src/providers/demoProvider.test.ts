@@ -6,7 +6,7 @@ function baseRequest(): AnalyzeRequest {
   return {
     lyrics: "Tu és fiel\n\nTu és fiel, tu és fiel",
     sections: [],
-    context: { theologicalTradition: "nao_selecionar", desiredChangeLevel: "refinar_mantendo_voz", bibleReferencesProvidedByUser: [] },
+    context: { theologicalTradition: "nao_selecionar", bibleReferencesProvidedByUser: [] },
     revisionMode: "completa",
     bibleTranslationPreference: "dominio_publico_almeida",
   };

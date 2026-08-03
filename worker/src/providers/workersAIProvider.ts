@@ -42,35 +42,35 @@ const QUICK_TEMPERATURE = 0.1;
 const QUICK_MAX_TOKENS = 500;
 const QUICK_RETRY_MAX_TOKENS = 350;
 
+// With only two areas left (biblica_teologica, portugues), every request
+// this Worker makes for a "revisão completa" — half as many as before — can
+// afford a noticeably bigger token budget per area without changing the
+// overall latency the composer experiences.
 const AREA_TEMPERATURE = 0.15;
-const AREA_MAX_TOKENS_COMPLETA = 500;
-const AREA_MAX_TOKENS_INDIVIDUAL = 650;
+const AREA_MAX_TOKENS_COMPLETA = 750;
+const AREA_MAX_TOKENS_INDIVIDUAL = 850;
 const AREA_RETRY_MAX_TOKENS = 350;
 
 const PORTUGUES_TEMPERATURE = 0.1;
-const PORTUGUES_MAX_TOKENS = 800;
+const PORTUGUES_MAX_TOKENS = 950;
 const PORTUGUES_RETRY_MAX_TOKENS = 450;
 
 // When a Gemini API key is configured, it's used as the primary attempt for
 // every area — the retry (if Gemini itself fails) always stays on the free
 // Workers AI binding regardless, so Gemini is additive, never a hard
 // dependency.
-const GEMINI_AREAS: ReadonlySet<Area> = new Set([
-  "portugues",
-  "biblica_teologica",
-  "composicao",
-  "congregacional",
-]);
+const GEMINI_AREAS: ReadonlySet<Area> = new Set(["portugues", "biblica_teologica"]);
 
 // Gemini isn't constrained by Cloudflare's per-request neuron/timeout
 // budget, so its primary attempt can afford noticeably more room than the
 // Workers AI budgets above — paired with the richer AREA_FOCUS_GEMINI
-// prompts (more corrections, more references, longer explanations).
+// prompts (more corrections, more references, longer explanations). With
+// composição and congregacional gone, every bit of this extra depth goes
+// into these two remaining areas — biblica_teologica most of all, since a
+// text-and-context biblical review is now the analysis's central focus.
 const GEMINI_MAX_TOKENS: Partial<Record<Area, number>> = {
-  portugues: 1400,
-  biblica_teologica: 900,
-  composicao: 900,
-  congregacional: 700,
+  portugues: 1600,
+  biblica_teologica: 1300,
 };
 
 const TIMEOUT_MESSAGE = "Esta parte da análise demorou mais que o esperado. Tente novamente.";

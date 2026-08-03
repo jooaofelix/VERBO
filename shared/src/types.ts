@@ -8,23 +8,16 @@ import {
   BibleLookupResponseSchema,
   BibleReferenceSchema,
   BiblicalContextAnalysisSchema,
-  ChorusAnalysisSchema,
-  CoherenceAnalysisSchema,
-  CompositionFindingSchema,
-  CongregationalAnalysisSchema,
   ConfidenceLevelSchema,
   FindingSeveritySchema,
   HighlightCategorySchema,
   RevisionModeSchema,
   SectionStatusValueSchema,
   TheologicalTraditionSchema,
-  DesiredChangeLevelSchema,
   FinalReportSchema,
   GrammarFindingSchema,
-  MoodAnalysisSchema,
   OverviewSummarySchema,
   ProsodyFindingSchema,
-  RhymeFindingSchema,
   SongContextInputSchema,
   SongSectionSchema,
   TheologicalClaimSchema,
@@ -36,7 +29,6 @@ export type FindingSeverity = z.infer<typeof FindingSeveritySchema>;
 export type HighlightCategory = z.infer<typeof HighlightCategorySchema>;
 export type RevisionMode = z.infer<typeof RevisionModeSchema>;
 export type TheologicalTradition = z.infer<typeof TheologicalTraditionSchema>;
-export type DesiredChangeLevel = z.infer<typeof DesiredChangeLevelSchema>;
 
 export type AnalysisFinding = z.infer<typeof AnalysisFindingSchema>;
 export type SongSection = z.infer<typeof SongSectionSchema>;
@@ -44,13 +36,7 @@ export type BibleReference = z.infer<typeof BibleReferenceSchema>;
 export type BiblicalContextAnalysis = z.infer<typeof BiblicalContextAnalysisSchema>;
 export type TheologicalClaim = z.infer<typeof TheologicalClaimSchema>;
 export type GrammarFinding = z.infer<typeof GrammarFindingSchema>;
-export type CompositionFinding = z.infer<typeof CompositionFindingSchema>;
-export type ChorusAnalysis = z.infer<typeof ChorusAnalysisSchema>;
 export type ProsodyFinding = z.infer<typeof ProsodyFindingSchema>;
-export type RhymeFinding = z.infer<typeof RhymeFindingSchema>;
-export type MoodAnalysis = z.infer<typeof MoodAnalysisSchema>;
-export type CongregationalAnalysis = z.infer<typeof CongregationalAnalysisSchema>;
-export type CoherenceAnalysis = z.infer<typeof CoherenceAnalysisSchema>;
 export type OverviewSummary = z.infer<typeof OverviewSummarySchema>;
 export type ComposerQuestion = z.infer<typeof ComposerQuestionSchema>;
 export type SectionStatusValue = z.infer<typeof SectionStatusValueSchema>;

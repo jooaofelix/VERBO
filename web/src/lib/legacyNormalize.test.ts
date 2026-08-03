@@ -63,7 +63,6 @@ describe("normalizeLegacyVersion", () => {
     const version = normalizeLegacyVersion("v1", { lyrics: "Letra qualquer" });
     expect(version.sections).toEqual([]);
     expect(version.context.theologicalTradition).toBe("nao_selecionar");
-    expect(version.context.desiredChangeLevel).toBe("refinar_mantendo_voz");
     expect(version.context.bibleReferencesProvidedByUser).toEqual([]);
   });
 
