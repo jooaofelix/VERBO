@@ -1,5 +1,6 @@
 import type { BibleLookupResponse, BibleReference } from "@verbo/shared";
 import { fetchExternalVerse } from "./abibliadigital.js";
+import { translateBookNameToPortuguese } from "./bookNames.js";
 import { BIBLE_DATASET_DISCLAIMER, CURATED_VERSES, type CuratedVerse } from "./dataset.js";
 
 const EXTERNAL_ATTRIBUTION =
@@ -80,7 +81,7 @@ export function listAvailableReferences(): string[] {
  * disponível" for a passage we already have.
  */
 function findCuratedByRange(book: string, chapterStart: number, verseStart: number): CuratedVerse | null {
-  const normalizedBook = normalize(book);
+  const normalizedBook = normalize(translateBookNameToPortuguese(book));
   for (const verse of CURATED_VERSES) {
     if (normalize(verse.book) !== normalizedBook) continue;
     if (verse.chapterStart !== chapterStart) continue;

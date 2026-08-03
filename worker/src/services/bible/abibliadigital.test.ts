@@ -19,6 +19,12 @@ describe("resolveBookAbbreviation", () => {
     expect(resolveBookAbbreviation("genesis")).toBe("gn");
   });
 
+  it("also resolves a common English book name the AI sometimes writes instead of Portuguese", () => {
+    expect(resolveBookAbbreviation("Romans")).toBe("rm");
+    expect(resolveBookAbbreviation("John")).toBe("jo");
+    expect(resolveBookAbbreviation("Psalms")).toBe("sl");
+  });
+
   it("handles numbered books with either numeral style", () => {
     expect(resolveBookAbbreviation("1 Coríntios")).toBe("1co");
     expect(resolveBookAbbreviation("I Coríntios")).toBe("1co");

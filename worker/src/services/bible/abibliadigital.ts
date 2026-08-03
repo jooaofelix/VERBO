@@ -1,3 +1,5 @@
+import { translateBookNameToPortuguese } from "./bookNames.js";
+
 const ABIBLIADIGITAL_BASE = "https://www.abibliadigital.com.br/api";
 const REQUEST_TIMEOUT_MS = 6000;
 // "acf" (Almeida Corrigida Fiel) is the closest available translation to the
@@ -96,9 +98,9 @@ function normalizeBookName(book: string): string {
     .trim();
 }
 
-/** Resolves a free-text Portuguese book name to abibliadigital's abbreviation, or null if unrecognized. */
+/** Resolves a free-text book name (Portuguese, or a common English fallback the AI sometimes uses) to abibliadigital's abbreviation, or null if unrecognized. */
 export function resolveBookAbbreviation(book: string): string | null {
-  return BOOK_ABBREVIATIONS[normalizeBookName(book)] ?? null;
+  return BOOK_ABBREVIATIONS[normalizeBookName(translateBookNameToPortuguese(book))] ?? null;
 }
 
 export interface ExternalVerseResult {

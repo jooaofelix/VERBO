@@ -107,6 +107,20 @@ describe("enrichBibleReferences", () => {
     expect(enriched.verseText).toContain("amou o mundo");
   });
 
+  it("still finds the curated text when the AI writes the book name in English (e.g. 'Romans' instead of 'Romanos')", async () => {
+    const [enriched] = await enrichBibleReferences([
+      ref({
+        referenceLabel: "Romans 8:38-39",
+        book: "Romans",
+        chapterStart: 8,
+        verseStart: 38,
+        verseEnd: 39,
+      }),
+    ]);
+    expect(enriched.verseTextAvailable).toBe(true);
+    expect(enriched.verseText).toContain("nem a morte, nem a vida");
+  });
+
   it("promotes a reference to 'forte' (proximity alta, confidence high) when the lyric excerpt really shares vocabulary with the verse text", async () => {
     const [enriched] = await enrichBibleReferences([
       ref({
